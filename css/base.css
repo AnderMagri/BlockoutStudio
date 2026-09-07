@@ -42,6 +42,10 @@
   --sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display',
           'Helvetica Neue', 'Inter', system-ui, sans-serif;
   --mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
+
+  /* Native scrollbars and form controls render light without this, which
+     put a white scrollbar across a dark panel. */
+  color-scheme: dark;
 }
 
 *{ box-sizing:border-box; margin:0; padding:0 }
@@ -123,6 +127,17 @@ button[disabled]:hover{ background:var(--fill) }
 .btn-quiet:hover{ background:var(--fill); color:var(--label) }
 
 .btn-danger:hover{ background:rgba(255,69,58,.22); color:#ff8b83 }
+
+/* Compact button that sizes to its label. Buttons default to width:100%
+   here, so anything sitting in a row needs this or it takes the whole row
+   and overlaps its neighbours. */
+button.tiny{
+  width:auto;
+  flex:none;
+  padding:4px 10px;
+  font-size:11px;
+  border-radius:7px;
+}
 
 /* ---------------- inputs ---------------- */
 

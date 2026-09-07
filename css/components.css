@@ -93,14 +93,18 @@
 .layer-head .kill:hover{ background:rgba(255,69,58,.20); color:#ff8b83 }
 .layer-head .solo.on{ color:var(--accent) }
 
-.layer-name{
+/* Qualified with the element, because the generic `input[type=text]` rule
+   in base.css is more specific than a bare class and would otherwise paint
+   a filled box behind every layer name. These read as labels until you
+   touch them. */
+input.layer-name{
   flex:1; min-width:0;
   background:transparent; border:none; color:var(--label);
   font:inherit; font-size:12px; letter-spacing:inherit;
   padding:2px 4px; border-radius:5px;
 }
-.layer-name:hover{ background:rgba(255,255,255,.07) }
-.layer-name:focus{ background:rgba(0,0,0,.35); outline:1.5px solid var(--accent) }
+input.layer-name:hover{ background:rgba(255,255,255,.07) }
+input.layer-name:focus{ background:rgba(0,0,0,.35); outline:1.5px solid var(--accent) }
 
 .count{
   font-size:10px; color:var(--label-3);
@@ -265,7 +269,7 @@ input.insp-name::placeholder{ color:var(--label-3) }
 .scene-list{
   display:flex; flex-direction:column; gap:5px;
   max-height:min(42vh, 300px);
-  overflow-y:auto;
+  overflow-y:auto; overflow-x:hidden;
   margin:0 -3px; padding:0 3px;
   scrollbar-width:thin;
   scrollbar-color:rgba(255,255,255,.18) transparent;
@@ -287,3 +291,4 @@ input.insp-name::placeholder{ color:var(--label-3) }
 }
 .scene-meta{ font-size:10px; color:var(--label-3) }
 .scene-row .tiny{ flex:none }
+.scene-meta{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
