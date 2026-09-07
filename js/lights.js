@@ -188,6 +188,39 @@ export function applyLightParams(light, params, target){
   if (target) target.position.copy(AIM);
 }
 
+/* ---------------- composition light ---------------- */
+
+/**
+ * A flat working light for arranging the scene.
+ *
+ * Not a rig and not in the store: it is a viewport aid, like the grid.
+ * Shadowless and near-even on purpose — while you are deciding where
+ * things go, cast shadows and deep falloff hide the geometry you are
+ * trying to judge. Just enough directionality to read form.
+ *
+ * It stays lit during exports, so a render taken in composition mode
+ * honestly looks like a flat working render rather than silently
+ * borrowing a rig that is switched off.
+ */
+export function makeCompositionRig(){
+  const group = new THREE.Group();
+  group.name = '__composition';
+
+  const sky = new THREE.HemisphereLight(0xffffff, 0x9a9a9a, 1.5);
+  group.add(sky);
+
+  const front = new THREE.DirectionalLight(0xffffff, 1.1);
+  front.position.set(0.6, 1.0, 0.8);
+  group.add(front, front.target);
+
+  const back = new THREE.DirectionalLight(0xffffff, 0.55);
+  back.position.set(-0.7, 0.5, -0.8);
+  group.add(back, back.target);
+
+  group.visible = false;
+  return group;
+}
+
 /* ---------------- rig gallery ---------------- */
 
 /**

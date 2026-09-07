@@ -31,7 +31,9 @@ It also works as-is on GitHub Pages (Settings → Pages → deploy from
 **Objects** — primitives, packaging silhouettes (bottle, can, jar, tube,
 cup, carton), everyday objects (book, magazine, card, phone, rock,
 boulder, cloud), a head, a poseable mannequin, extruded text and editable
-splines.
+splines. They live in a tabbed card box, and each card's picture is
+rendered from the real geometry at startup — so a new catalog entry gets
+its artwork for free and the picture can never drift from the shape.
 
 **Cameras are objects.** Drop one in, move it with the gizmo, select it to
 set the lens. Focal lengths are full-frame equivalents and the real focal
@@ -39,6 +41,15 @@ length is derived from the sensor format you choose, so "85 mm" looks like
 85 mm on APS-C too. Depth of field is computed from the actual optics —
 hyperfocal distance, near and far limits, and a circle of confusion that
 changes with format.
+
+**The set** is switchable: none, ground only, ground plus backdrop, or an
+infinite cove — a seamless sweep with no corner and no horizon, which is
+the white-studio look. "None" leaves your objects against empty space and
+gives the cleanest depth and mask passes.
+
+**Composition light** is a flat, shadowless working light for arranging a
+scene. It mutes the lighting rig rather than replacing it, so the rig you
+tuned is still there when you switch back.
 
 **Lights are objects too.** Twelve rigs built the way they are built on a
 real set — three-point, softbox, clamshell, Rembrandt, split, backlit rim,
@@ -200,9 +211,9 @@ One entry in `js/catalog.js`:
 ```
 
 `make` may return a geometry, a mesh or a whole `Object3D`. `rest:'float'`
-leaves it in the air instead of sitting it on the floor. The Add menu,
-the layer icons and the scene API all read from the catalog, so there is
-nothing else to update.
+leaves it in the air instead of sitting it on the floor. The card box, its
+thumbnail, the layer icons and the scene API all read from the catalog, so
+there is nothing else to update — including the artwork.
 
 Entries carrying a `special` flag (`text`, `spline`, `mannequin`,
 `camera`, `light`) are routed to their own constructors in
@@ -236,6 +247,7 @@ js/
   export.js         render / depth / normal / mask
   prompt.js         setup → prompt text
   api.js            scene JSON in and out
+  thumbnails.js     card artwork, rendered from the catalog
   bridge.js         talks to the MCP server
   ui.js             the HUD wiring
 mcp/

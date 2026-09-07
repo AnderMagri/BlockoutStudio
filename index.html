@@ -56,9 +56,11 @@
 
   <!-- ============ left: build ============ -->
   <aside class="hud hud-left">
-    <div class="panel">
-      <button class="btn-accent" id="addBtn" aria-haspopup="menu" aria-expanded="false">Add object</button>
-    </div>
+    <section class="panel objects-panel">
+      <h2>Objects</h2>
+      <div class="tabs" id="objectTabs" role="tablist"></div>
+      <div class="cards" id="objectCards" role="tabpanel"></div>
+    </section>
 
     <div class="panel panel-grow">
       <h2>Layers</h2>
@@ -76,9 +78,20 @@
     </section>
 
     <section class="panel">
-      <h2>Lighting rig</h2>
+      <h2>Set</h2>
+      <label class="sr-only" for="setMode">Set</label>
+      <select id="setMode"></select>
+      <p class="caption" style="margin-top:7px">“None” gives the cleanest depth and mask passes — nothing but your objects.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Lighting</h2>
+      <label class="switch" id="compSwitch">Composition light
+        <input type="checkbox" id="compositionMode">
+      </label>
+      <p class="caption" style="margin-bottom:10px">Flat and shadowless for arranging the scene. Mutes the rig without deleting it.</p>
       <div class="gallery" id="lightGallery"></div>
-      <p class="caption">Replaces the lights in the Lighting layer. Select any light afterwards to adjust it.</p>
+      <p class="caption">A rig replaces the lights in the Lighting layer. Select any light afterwards to adjust it.</p>
     </section>
 
   </aside>

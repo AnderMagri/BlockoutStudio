@@ -58,6 +58,7 @@ function renderLayer(layer){
   };
 
   const name = el('input', 'layer-name');
+  name.type = 'text';
   name.value = layer.name;
   name.onclick = e => e.stopPropagation();
   // Rename on blur, not on every keystroke: renaming to "" mid-edit and

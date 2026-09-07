@@ -23,8 +23,11 @@
      "lighting": { "rig":"softbox" },
      "camera":   { "lens":85, "fstop":2.8, "focus":0.6,
                    "format":"ff", "shot":"hero" },
+     "set":      "infinite",
      "export":   { "aspect":"4:5", "resolution":1536 }
    }
+
+   `set` is one of none | ground | backdrop | infinite.
 
    Every field is optional. `id` is any catalog id (see catalog.js).
    ============================================================ */
@@ -142,7 +145,10 @@ export async function applyScene(scene, { replace = true, hooks = {} } = {}){
     else hooks.setRig?.(rig);
   }
 
-  /* ---- camera and export ---- */
+  /* ---- stage, camera and export ---- */
+  if (scene.set != null || scene.compositionLight != null){
+    hooks.setStage?.({ set: scene.set, compositionLight: scene.compositionLight });
+  }
   if (scene.export) hooks.setExport?.(scene.export);
   if (scene.camera) hooks.setCamera?.(scene.camera);
 
@@ -193,6 +199,8 @@ export function serializeScene(cameraState = {}){
       format: cameraState.formatId,
       shot:   cameraState.shotId ?? null
     },
+    set: store.state.setMode,
+    compositionLight: store.state.compositionMode,
     export: { aspect: cameraState.aspect, resolution: cameraState.resolution }
   };
 }
@@ -215,7 +223,8 @@ export function vocabulary(){
     shots:       SHOTS.map(s => s.id),
     formats:     Object.keys(FORMATS),
     aspects:     ASPECTS.map(a => a.id),
-    resolutions: RESOLUTIONS
+    resolutions: RESOLUTIONS,
+    sets:        Object.keys(store.SET_MODES)
   };
 }
 

@@ -65,18 +65,71 @@ const matBack   = new THREE.MeshStandardMaterial({ color:0x5a5a5a, roughness:0.9
 // figure with the camera pulled well back. The floor stops exactly where the
 // backdrop starts — a floor that carries on behind the wall shows up as a
 // bright band above the seam.
-const SET = 40;
+const SET  = 40;
+const BACK = -1.2;              // where the floor meets the wall
 
 export const ground = new THREE.Mesh(new THREE.PlaneGeometry(SET, SET), matGround);
 ground.rotation.x = -Math.PI / 2;
-ground.position.set(0, 0, SET / 2 - 1.2);
+ground.position.set(0, 0, SET / 2 + BACK);
 ground.receiveShadow = true;
 scene.add(ground);
 
 export const backdrop = new THREE.Mesh(new THREE.PlaneGeometry(SET, SET * 0.6), matBack);
-backdrop.position.set(0, SET * 0.3, -1.2);
+backdrop.position.set(0, SET * 0.3, BACK);
 backdrop.receiveShadow = true;
 scene.add(backdrop);
+
+/**
+ * An infinity cove: floor sweeping into wall through a fillet, with no seam
+ * and no horizon line. This is the seamless white studio look, and it is a
+ * genuinely different surface from floor-plus-wall — not the same thing with
+ * the corner hidden.
+ *
+ * Built as a parametric strip rather than an extruded shape: a sweep is a
+ * surface, not a solid, and sampling the profile directly keeps the fillet
+ * exactly tangent at both ends.
+ */
+function cycloramaGeometry({
+  width = SET, front = SET * 0.45, radius = 1.4,
+  wallHeight = SET * 0.6, back = BACK, segments = 28
+} = {}){
+  const profile = [];
+  const cz = back + radius;                 // fillet centre
+  profile.push(new THREE.Vector2(front, 0));
+  profile.push(new THREE.Vector2(cz, 0));   // floor runs in tangent to the arc
+  for (let i = 1; i <= segments; i++){
+    const a = (i / segments) * Math.PI / 2;
+    profile.push(new THREE.Vector2(cz - radius * Math.sin(a), radius - radius * Math.cos(a)));
+  }
+  profile.push(new THREE.Vector2(back, wallHeight));
+
+  const half = width / 2;
+  const positions = [];
+  const indices = [];
+
+  for (const p of profile){
+    positions.push(-half, p.y, p.x);
+    positions.push( half, p.y, p.x);
+  }
+  for (let i = 0; i < profile.length - 1; i++){
+    const a = i * 2, b = a + 1, c = a + 2, d = a + 3;
+    indices.push(a, b, d, a, d, c);
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+export const cyclorama = new THREE.Mesh(
+  cycloramaGeometry(),
+  new THREE.MeshStandardMaterial({ color:0x6a6a6a, roughness:0.87, side:THREE.DoubleSide })
+);
+cyclorama.receiveShadow = true;
+cyclorama.visible = false;
+scene.add(cyclorama);
 
 export const grid = new THREE.GridHelper(2, 40, 0x3A3A3A, 0x2A2A2A);
 grid.position.y = 0.0006;

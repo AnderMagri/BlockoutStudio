@@ -282,6 +282,17 @@ const TOOLS = [
           properties:{ aspect:{ type:'string' }, resolution:{ type:'number' } },
           additionalProperties:false
         },
+        set:{
+          type:'string',
+          enum:['none','ground','backdrop','infinite'],
+          description:'The set. "none" leaves objects against empty space and gives ' +
+                      'the cleanest depth and mask passes; "infinite" is a seamless cove.'
+        },
+        compositionLight:{
+          type:'boolean',
+          description:'Flat shadowless working light, with the lighting rig muted. ' +
+                      'Useful while arranging; turn it off before rendering for look.'
+        },
         replace:{
           type:'boolean',
           description:'Clear existing objects first. Default true. Pass false to add to the scene.'

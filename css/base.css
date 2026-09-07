@@ -126,7 +126,7 @@ button[disabled]:hover{ background:var(--fill) }
 
 /* ---------------- inputs ---------------- */
 
-select, input[type=text], input[type=number], textarea{
+select, input:not([type]), input[type=text], input[type=number], textarea{
   width:100%;
   font:inherit;
   letter-spacing:inherit;

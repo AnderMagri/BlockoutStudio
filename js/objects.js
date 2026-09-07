@@ -10,7 +10,7 @@ import * as THREE from 'three';
 import * as store from './store.js';
 import {
   scene, helpers, extraHelpers, gizmo, orbit,
-  ground, backdrop, freeCamera, activeCamera, setActiveCamera, pointerToNDC
+  ground, backdrop, cyclorama, freeCamera, activeCamera, setActiveCamera, pointerToNDC
 } from './viewport.js';
 import { makeCatalogObject, labelFor, catalogItem } from './catalog.js';
 import { makeMannequin, buildJointHandles, highlightJointHandle, applyPose, poseById } from './figure.js';
@@ -18,7 +18,7 @@ import { makeText, rebuildText } from './text.js';
 import {
   makeSpline, rebuildSpline, setHandlesVisible, highlightHandle
 } from './spline.js';
-import { makeLight, applyLightParams, unplace, rigById } from './lights.js';
+import { makeLight, applyLightParams, unplace, rigById, makeCompositionRig } from './lights.js';
 import { FORMATS, focalFromEquiv } from './optics.js';
 import { toast } from './util.js';
 
@@ -34,7 +34,30 @@ export const getActiveHandle = () => activeHandle;
 
 /* ---------------- bootstrap ---------------- */
 
+const compositionRig = makeCompositionRig();
+
+/** Flat working light on or off. Rig lights are muted, never destroyed. */
+export function setCompositionMode(on){
+  store.state.compositionMode = !!on;
+  compositionRig.visible = !!on;
+  store.applyVisibility();
+  store.changed();
+  return store.state.compositionMode;
+}
+
+export const compositionMode = () => store.state.compositionMode;
+
+/** Choose the set: none, ground, backdrop or infinite. */
+export function setSetMode(mode){
+  if (!store.SET_MODES[mode]) return store.state.setMode;
+  store.state.setMode = mode;
+  store.applyVisibility();
+  store.changed();
+  return mode;
+}
+
 export function initScene(){
+  scene.add(compositionRig);
   store.addLayer('Product');
   const lighting = store.addLayer('Lighting');
   const cameras  = store.addLayer('Cameras');
@@ -45,6 +68,9 @@ export function initScene(){
   });
   store.addItem({
     name:'Backdrop', kind:'set', sub:'backdrop', obj:backdrop, layerId:set.id, locked:true
+  });
+  store.addItem({
+    name:'Infinite cove', kind:'set', sub:'cyclorama', obj:cyclorama, layerId:set.id, locked:true
   });
 
   store.state.activeLayerId = store.state.layers[0].id;

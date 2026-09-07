@@ -111,6 +111,7 @@ function headerFor(item){
   head.appendChild(el('span', 'insp-kind', item.sub || item.kind));
 
   const name = el('input', 'insp-name');
+  name.type = 'text';
   name.value = item.name;
   name.oninput = e => { item.name = e.target.value; store.emit('names'); };
   head.appendChild(name);

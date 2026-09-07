@@ -27,8 +27,30 @@ export const state = {
   activeLayerId: null,
   soloLayerId: null,
   /** @type {SceneItem|null} */
-  selected: null
+  selected: null,
+  /** Flat working light on, every rig light muted. Non-destructive. */
+  compositionMode: false,
+  /** 'none' | 'ground' | 'backdrop' | 'infinite' */
+  setMode: 'backdrop'
 };
+
+/**
+ * Which set pieces a given mode uses.
+ *   none      nothing — objects float against empty space, which gives the
+ *             cleanest possible depth and mask passes
+ *   ground    floor only, open horizon
+ *   backdrop  floor meeting a vertical wall, with a visible corner
+ *   infinite  a seamless cove, no seam and no horizon line
+ */
+export const SET_MODES = {
+  none:     [],
+  ground:   ['ground'],
+  backdrop: ['ground', 'backdrop'],
+  infinite: ['cyclorama']
+};
+
+export const setPieceLive = (sub, mode = state.setMode) =>
+  (SET_MODES[mode] || SET_MODES.backdrop).includes(sub);
 
 let itemSeq = 0;
 let layerSeq = 0;
@@ -144,7 +166,15 @@ export function applyVisibility(){
   const solo = state.soloLayerId;
   for (const item of state.items){
     const layer = getLayer(item.layerId);
-    const on = !layer ? true : (solo ? layer.id === solo : layer.visible);
+    let on = !layer ? true : (solo ? layer.id === solo : layer.visible);
+
+    // Composition mode mutes every rig light without deleting one, so the
+    // setup you tuned is still there when you switch back.
+    if (on && item.kind === 'light' && state.compositionMode) on = false;
+
+    // Set pieces answer to the chosen set as well as to their layer.
+    if (on && item.kind === 'set') on = setPieceLive(item.sub);
+
     item.obj.visible = on;
     if (item.helper) item.helper.visible = on;
   }

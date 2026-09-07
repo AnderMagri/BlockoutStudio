@@ -138,11 +138,15 @@
   background:rgba(191,90,242,.16);
   border-radius:5px; padding:2px 6px; flex:none;
 }
+/* Explicit colour: this input carries no type attribute, and relying on the
+   generic input rule to reach it is exactly how it ended up dark-on-dark. */
 input.insp-name{
   flex:1; min-width:0;
+  color:var(--label);
   background:var(--fill); border-radius:7px;
   padding:4px 8px; font-size:12.5px;
 }
+input.insp-name::placeholder{ color:var(--label-3) }
 
 .empty-note{ font-size:11.5px; color:var(--label-3); padding:2px 0 }
 
@@ -162,3 +166,72 @@ input.insp-name{
 .opts summary::before{ content:'▸ '; color:var(--label-3) }
 .opts[open] summary::before{ content:'▾ ' }
 .opts .caption{ margin-top:5px }
+
+/* ---------------- object picker ---------------- */
+
+.objects-panel{ flex:none }
+
+.tabs{
+  display:flex; gap:2px;
+  background:var(--fill);
+  border-radius:9px;
+  padding:2px;
+  margin-bottom:9px;
+  overflow-x:auto;
+  scrollbar-width:none;
+}
+.tabs::-webkit-scrollbar{ display:none }
+
+.tab{
+  width:auto; flex:1 0 auto;
+  background:transparent;
+  border-radius:7px;
+  padding:3px 8px;
+  font-size:10.5px; font-weight:530;
+  color:var(--label-2);
+  white-space:nowrap;
+}
+.tab:hover{ background:rgba(255,255,255,.06) }
+.tab.on{
+  background:var(--fill-selected);
+  color:var(--label);
+  box-shadow:0 1px 3px rgba(0,0,0,.32), 0 0 0 .5px rgba(0,0,0,.14);
+}
+
+.cards{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:6px;
+  max-height:320px;
+  overflow-y:auto;
+  margin:0 -3px; padding:0 3px 2px;
+  scrollbar-width:thin;
+  scrollbar-color:rgba(255,255,255,.18) transparent;
+}
+.cards::-webkit-scrollbar{ width:6px }
+.cards::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.16); border-radius:3px }
+
+.card{
+  display:flex; flex-direction:column; align-items:center; gap:3px;
+  padding:7px 4px 6px;
+  border-radius:10px;
+  background:var(--fill);
+}
+.card:hover{ background:var(--fill-strong) }
+.card:active{ transform:scale(.96) }
+
+.card-art{
+  display:flex; align-items:center; justify-content:center;
+  width:100%; height:46px;
+}
+.card-art img{
+  max-width:100%; max-height:100%;
+  /* The thumbnails are lit for a light ground; lift them on dark glass. */
+  filter:brightness(1.06) contrast(1.02);
+}
+.card-glyph{ font-size:19px; color:var(--label-3) }
+.card-label{
+  font-size:10.5px; color:var(--label-2);
+  text-align:center; line-height:1.2;
+}
+.card:hover .card-label{ color:var(--label) }

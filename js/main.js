@@ -8,7 +8,8 @@ import {
   initScene, addFromCatalog, addCameraObject, applyRig,
   updateHelpers, select, frameSubject, lookThrough
 } from './objects.js';
-import { initUI, applyShot } from './ui.js';
+import { initUI, applyShot, refreshObjectCards } from './ui.js';
+import { buildThumbnails } from './thumbnails.js';
 import { connectBridge } from './bridge.js';
 import { SHOTS } from './optics.js';
 import { $ } from './util.js';
@@ -41,6 +42,13 @@ function boot(){
 
   resize();
   tick();
+
+  // Card artwork is rendered from the real geometry, offscreen. It runs
+  // after the first frame so a slow machine still paints immediately;
+  // until it lands the cards show glyphs.
+  buildThumbnails()
+    .then(refreshObjectCards)
+    .catch(err => console.warn('[thumbnails]', err));
 }
 
 try {

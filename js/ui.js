@@ -14,9 +14,10 @@ import {
 } from './viewport.js';
 import {
   addFromCatalog, applyRig, select, duplicateSelected, destroySelected,
-  pickAt, lookThrough, frameSubject, applyCameraParams
+  pickAt, lookThrough, frameSubject, applyCameraParams, setCompositionMode, setSetMode
 } from './objects.js';
 import { CATEGORIES } from './catalog.js';
+import { thumbnails, GLYPHS } from './thumbnails.js';
 import { RIGS, rigById } from './lights.js';
 import {
   FORMATS, ASPECTS, RESOLUTIONS, SHOTS,
@@ -81,61 +82,84 @@ function renderViewSeg(){
   }
 }
 
-/* ---------------- add menu ---------------- */
+/* ---------------- object picker ---------------- */
 
-const GLYPH = {
-  primitives:'◻', packaging:'▯', objects:'◨', figures:'☺', special:'✦'
-};
+/* A tabbed box of cards rather than a dropdown: the whole catalogue is
+   visible at a glance, and the thumbnails are rendered from the real
+   geometry so a new catalog entry needs no artwork. */
 
-let openMenu = null;
+let activeTab = CATEGORIES[0].id;
 
-function closeMenu(){
-  if (!openMenu) return;
-  openMenu.remove();
-  openMenu = null;
-  $('addBtn')?.setAttribute('aria-expanded', 'false');
+function renderObjectTabs(){
+  const host = $('objectTabs');
+  host.innerHTML = '';
+
+  for (const cat of CATEGORIES){
+    const b = el('button', 'tab' + (cat.id === activeTab ? ' on' : ''), cat.label);
+    b.setAttribute('role', 'tab');
+    b.setAttribute('aria-selected', cat.id === activeTab ? 'true' : 'false');
+    b.onclick = () => { activeTab = cat.id; renderObjectTabs(); renderObjectCards(); };
+    host.appendChild(b);
+  }
 }
 
-function buildAddMenu(){
-  const btn = $('addBtn');
+function renderObjectCards(){
+  const host = $('objectCards');
+  host.innerHTML = '';
 
-  btn.onclick = e => {
-    e.stopPropagation();
-    if (openMenu){ closeMenu(); return; }
+  const cat = CATEGORIES.find(c => c.id === activeTab) || CATEGORIES[0];
 
-    const menu = el('div', 'menu');
-    menu.setAttribute('role', 'menu');
+  for (const item of cat.items){
+    const card = el('button', 'card');
+    card.title = `Add ${item.label}`;
 
-    for (const cat of CATEGORIES){
-      const group = el('div', 'menu-group');
-      group.appendChild(el('div', 'menu-label', cat.label));
-
-      for (const item of cat.items){
-        const b = el('button');
-        b.appendChild(el('span', 'g', GLYPH[cat.id] ?? '◻'));
-        b.appendChild(el('span', null, item.label));
-        b.onclick = () => {
-          closeMenu();
-          addFromCatalog(item.id);
-        };
-        group.appendChild(b);
-      }
-      menu.appendChild(group);
+    const art = el('span', 'card-art');
+    const thumb = thumbnails.get(item.id);
+    if (thumb){
+      const img = el('img');
+      img.src = thumb;
+      img.alt = '';
+      art.appendChild(img);
+    } else {
+      art.appendChild(el('span', 'card-glyph', GLYPHS[item.id] ?? '◻'));
     }
 
-    const r = btn.getBoundingClientRect();
-    menu.style.left = `${r.left}px`;
-    menu.style.top  = `${r.bottom + 6}px`;
-    document.body.appendChild(menu);
-    openMenu = menu;
-    btn.setAttribute('aria-expanded', 'true');
-  };
+    card.appendChild(art);
+    card.appendChild(el('span', 'card-label', item.label));
+    card.onclick = () => addFromCatalog(item.id);
+    host.appendChild(card);
+  }
+}
 
-  document.addEventListener('click', closeMenu);
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
+/** Called once the offscreen renders finish, to swap glyphs for pictures. */
+export function refreshObjectCards(){
+  renderObjectCards();
 }
 
 /* ---------------- lighting gallery ---------------- */
+
+const SET_LABELS = [
+  { value:'none',     label:'None — objects only' },
+  { value:'ground',   label:'Ground' },
+  { value:'backdrop', label:'Ground + backdrop' },
+  { value:'infinite', label:'Infinite cove' }
+];
+
+function buildSetControl(){
+  const sel = $('setMode');
+  fillSelect(sel, SET_LABELS, store.state.setMode);
+  sel.onchange = e => setSetMode(e.target.value);
+}
+
+function buildCompositionToggle(){
+  const box = $('compositionMode');
+  box.onchange = () => {
+    setCompositionMode(box.checked);
+    toast(box.checked
+      ? 'Composition light on — rigs muted'
+      : 'Composition light off — rigs restored');
+  };
+}
 
 function buildRigGallery(){
   const host = $('lightGallery');
@@ -455,6 +479,18 @@ const apiHooks = {
   },
   setRig(rig){ currentRig = rig; markRig(rig.id); },
 
+  /** applyScene can choose the set and the working light. */
+  setStage(spec){
+    if (spec.set && store.SET_MODES[spec.set]){
+      setSetMode(spec.set);
+      $('setMode').value = spec.set;
+    }
+    if (spec.compositionLight != null){
+      setCompositionMode(!!spec.compositionLight);
+      $('compositionMode').checked = !!spec.compositionLight;
+    }
+  },
+
   /** The prose description, built from the same live state as the sheet. */
   describeSetup(){
     const p = currentParams();
@@ -506,7 +542,10 @@ export function applyShot(shot){
 /* ---------------- boot ---------------- */
 
 export function initUI(){
-  buildAddMenu();
+  renderObjectTabs();
+  renderObjectCards();
+  buildSetControl();
+  buildCompositionToggle();
   buildRigGallery();
   buildExportControls();
   buildInput();
