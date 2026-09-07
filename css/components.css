@@ -33,15 +33,17 @@
 }
 .tile .t-name{ font-size:11.5px; font-weight:530 }
 .tile .t-meta{
-  font-family:var(--mono); font-size:9px;
-  color:var(--label-3); font-variant-numeric:tabular-nums;
+  font-family:var(--mono); font-size:10px;
+  /* Was 9px at var(--label-3), which measured 3.06:1 — under the 4.5:1
+     WCAG AA wants, on the smallest text in the app. */
+  color:var(--label-2); font-variant-numeric:tabular-nums;
 }
 .tile.on{
   background:var(--accent);
   color:#fff;
   box-shadow:0 2px 8px rgba(191,90,242,.30);
 }
-.tile.on .t-meta{ color:rgba(255,255,255,.66) }
+.tile.on .t-meta{ color:rgba(255,255,255,.88) }
 
 /* ---------------- fields ---------------- */
 
@@ -259,7 +261,7 @@ input.insp-name::placeholder{ color:var(--label-3) }
 }
 .card-glyph{ font-size:19px; color:var(--label-3) }
 .card-label{
-  font-size:10.5px; color:var(--label-2);
+  font-size:11px; color:var(--label-2);
   text-align:center; line-height:1.2;
 }
 .card:hover .card-label{ color:var(--label) }
@@ -289,7 +291,7 @@ input.insp-name::placeholder{ color:var(--label-3) }
   font-size:12.5px; font-weight:530;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
-.scene-meta{ font-size:10px; color:var(--label-3) }
+.scene-meta{ font-size:10.5px; color:var(--label-2) }
 .scene-row .tiny{ flex:none }
 .scene-meta{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
 

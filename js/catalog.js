@@ -100,12 +100,33 @@ function cloudGeometry(){
   return mergeGeometries(parts, false);
 }
 
-/** A book: text block plus a cover that overhangs it slightly. */
+/**
+ * A book: a text block with a cover overhanging it slightly.
+ *
+ * Both halves are de-indexed and stripped to position/normal/uv before
+ * merging. mergeGeometries refuses to combine an indexed BoxGeometry with
+ * a non-indexed ExtrudeGeometry, and its failure is a console warning plus
+ * a null return — which silently produced a book with no pages.
+ */
 function bookGeometry(){
   const w = 0.145, h = 0.210, d = 0.032;
+
   const pages = new THREE.BoxGeometry(w - 0.006, h - 0.008, d - 0.006);
   const cover = roundedSlab(w, h, d, 0.004);
-  return mergeGeometries([pages, cover], false) || cover;
+
+  const merged = mergeGeometries([normalise(pages), normalise(cover)], false);
+  return merged || cover;
+}
+
+/** Same attributes, same indexing — the two conditions mergeGeometries needs. */
+function normalise(geo){
+  const flat = geo.index ? geo.toNonIndexed() : geo;
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', flat.getAttribute('position'));
+  if (flat.getAttribute('normal')) out.setAttribute('normal', flat.getAttribute('normal'));
+  if (flat.getAttribute('uv'))     out.setAttribute('uv', flat.getAttribute('uv'));
+  if (!out.getAttribute('normal')) out.computeVertexNormals();
+  return out;
 }
 
 /* ---------------- the catalog ---------------- */

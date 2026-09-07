@@ -36,7 +36,8 @@ import * as THREE from 'three';
 
 import * as store from './store.js';
 import {
-  addFromCatalog, addMannequinObject, setPose, applyRig,
+  addFromCatalog, addMannequinObject, setPose, applyRig, addCameraObject,
+  applyCameraParams, updateLight,
   destroyItem, select, frameSubject, updateTextObject, fitShadowCameras
 } from './objects.js';
 import { CATEGORIES, catalogItem } from './catalog.js';
@@ -45,6 +46,7 @@ import { RIGS } from './lights.js';
 import { LENSES, SHOTS, ASPECTS, RESOLUTIONS, FORMATS } from './optics.js';
 import { toast } from './util.js';
 import * as scenes from './scenes.js';
+import { activeCamera as activeCameraForApi } from './viewport.js';
 
 /* ---------------- helpers ---------------- */
 
@@ -81,9 +83,19 @@ export async function applyScene(scene, { replace = true, hooks = {} } = {}){
     return { added:0, warnings:['Scene is not an object.'] };
   }
 
+  // Does this scene say anything about lighting? If not, the lights that
+  // are already up are left alone — clearing them would hand back a black
+  // stage to anyone who only meant to swap the objects.
+  const definesLights   = (scene.objects || []).some(o => o.id === 'light');
+  const definesLighting = definesLights || !!scene.lighting?.rig;
+
   if (replace){
     for (const item of [...store.state.items]){
-      if (item.kind === 'mesh') destroyItem(item);
+      if (item.kind === 'mesh')   { destroyItem(item); continue; }
+      // Cameras always go: leaving them meant every rebuild added another,
+      // so they piled up. A fresh one is created below if the scene has none.
+      if (item.kind === 'camera') { destroyItem(item); continue; }
+      if (item.kind === 'light' && definesLighting) destroyItem(item);
     }
     select(null);
   }
@@ -100,6 +112,16 @@ export async function applyScene(scene, { replace = true, hooks = {} } = {}){
 
     const item = await (spec.id === 'mannequin' ? addMannequinObject() : addFromCatalog(spec.id));
     store.state.activeLayerId = previousActive;
+
+    // Cameras and lights carry settings, not just a transform.
+    if (item && spec.id === 'camera' && spec.camera){
+      Object.assign(item.params, spec.camera);
+      applyCameraParams(item);
+    }
+    if (item && spec.id === 'light' && spec.light){
+      Object.assign(item.params, spec.light);
+      updateLight(item);
+    }
 
     if (!item){ warnings.push(`Could not build "${spec.id}"`); continue; }
     added++;
@@ -140,11 +162,16 @@ export async function applyScene(scene, { replace = true, hooks = {} } = {}){
   }
 
   /* ---- lighting ---- */
-  if (scene.lighting?.rig){
+  // Explicit lights win: if the scene lists them, applying the rig on top
+  // would duplicate every fixture.
+  if (scene.lighting?.rig && !definesLights){
     const rig = applyRig(scene.lighting.rig);
     if (!rig) warnings.push(`Unknown lighting rig: "${scene.lighting.rig}"`);
     else hooks.setRig?.(rig);
   }
+
+  // There is always a camera.
+  if (!store.itemsOfKind('camera').length) addCameraObject();
 
   /* ---- stage, camera and export ---- */
   if (scene.set != null || scene.compositionLight != null){
@@ -169,8 +196,24 @@ export function serializeScene(cameraState = {}){
   const round = n => Math.round(n * 1000) / 1000;
 
   const objects = store.state.items
-    .filter(i => i.kind === 'mesh')
+    .filter(i => i.kind === 'mesh' || i.kind === 'camera' || i.kind === 'light')
     .map(item => {
+      if (item.kind === 'camera'){
+        return {
+          id:'camera', name:item.name,
+          position:[round(item.obj.position.x), round(item.obj.position.y), round(item.obj.position.z)],
+          rotation:[deg(item.obj.rotation.x), deg(item.obj.rotation.y), deg(item.obj.rotation.z)],
+          layer: store.getLayer(item.layerId)?.name,
+          camera:{ ...item.params }
+        };
+      }
+      if (item.kind === 'light'){
+        return {
+          id:'light', name:item.name,
+          layer: store.getLayer(item.layerId)?.name,
+          light:{ ...item.params }
+        };
+      }
       const spec = {
         id: item.sub,
         name: item.name,
@@ -247,7 +290,9 @@ export function installGlobalAPI(hooks){
     },
     serializeScene: () => serializeScene(hooks.cameraState?.() ?? {}),
     vocabulary,
-    frameSubject,
+
+    /** Fit the active camera to the subject. */
+    frameSubject: () => frameSubject(activeCameraForApi()),
 
     /** Adjust the camera without rebuilding anything. */
     setCamera(spec){

@@ -47,8 +47,15 @@ function buildOne(id, def){
  * @returns {Promise<Map<string,string>>}
  */
 export async function buildThumbnails(){
-  // One frame first, so the studio paints before this starts.
-  await new Promise(requestAnimationFrame);
+  // Wait for one painted frame so the studio appears first — but never
+  // wait forever. requestAnimationFrame does not fire in a background tab,
+  // and gating on it alone left the cards showing placeholder glyphs
+  // permanently for anyone who opened the app in a tab they weren't
+  // looking at.
+  await Promise.race([
+    new Promise(requestAnimationFrame),
+    new Promise(r => setTimeout(r, 400))
+  ]);
 
   let renderer;
   try {

@@ -12,6 +12,14 @@ import { kelvinName, mm } from './util.js';
 import { describeLight } from './lights.js';
 import { labelFor } from './catalog.js';
 
+/** What each set mode actually looks like, in prompt language. */
+const SET_WORDS = {
+  none:     'floating against an empty background, no visible surface',
+  ground:   'standing on a plain continuous surface with an open horizon',
+  backdrop: 'on a plain surface against a flat backdrop wall',
+  infinite: 'on a seamless infinity cove, no horizon line and no visible corner'
+};
+
 /** Count the subject shapes so the prompt can mention the arrangement. */
 function describeSubject(){
   const meshes = store.subjectMeshes();
@@ -82,9 +90,11 @@ export function buildPrompt(ctx){
     ? `${dofCharacter(ctx.dof.total)} — roughly ${mm(ctx.dof.total)} of the scene is sharp`
     : dofCharacter(ctx.dof.total);
 
+  const setLine = SET_WORDS[store.state.setMode] ?? SET_WORDS.backdrop;
+
   return [
     describeSubject(),
-    '· on [surface], in [environment]',
+    `· ${setLine}, in [environment]`,
     `· camera: ${camera}`,
     `· depth of field: ${dofLine}`,
     ...lighting.map(l => `· lighting: ${l}`),

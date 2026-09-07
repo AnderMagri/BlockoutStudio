@@ -58,7 +58,9 @@ export function measure(m){
  */
 export function parse(text){
   const raw = String(text).trim().toLowerCase();
-  const match = raw.match(/^(-?[\d.]+)\s*(mm|cm|m|in|")?$/);
+  // One optional decimal point, not a run of them: "12.5.5" is a typo,
+  // and parseFloat would quietly read it as 12.5.
+  const match = raw.match(/^(-?\d+(?:\.\d+)?)\s*(mm|cm|m|in|")?$/);
   if (!match) return null;
 
   const n = parseFloat(match[1]);

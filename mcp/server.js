@@ -215,7 +215,14 @@ const server = http.createServer(async (req, res) => {
 
   fs.readFile(file, (err, data) => {
     if (err){ res.writeHead(404, cors); return res.end('Not found'); }
-    res.writeHead(200, { ...cors, 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream' });
+    res.writeHead(200, {
+      ...cors,
+      'Content-Type': MIME[path.extname(file)] || 'application/octet-stream',
+      // Never cache. The browser holds ES modules aggressively, and a
+      // reload that quietly runs yesterday's code is worse than a slightly
+      // slower one — especially when editing between reloads.
+      'Cache-Control': 'no-store, must-revalidate'
+    });
     res.end(data);
   });
 });

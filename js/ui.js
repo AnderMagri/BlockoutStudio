@@ -575,7 +575,12 @@ function openScenesPanel(){
 
           const del = el('button', 'tiny btn-danger', '×');
           del.title = 'Delete';
-          del.onclick = () => { deleteScene(entry.name); repaint(); };
+          del.onclick = () => {
+            // Deleting a saved scene cannot be undone, so it gets a question.
+            if (!confirm(`Delete the saved scene “${entry.name}”?`)) return;
+            deleteScene(entry.name);
+            repaint();
+          };
 
           row.append(open, dl, del);
           list.appendChild(row);

@@ -160,17 +160,29 @@ export function addMannequinObject(){
   item.handles = handles;
   item.params  = { pose:'relaxed' };
 
+  root.updateMatrixWorld(true);
+  restOnGround(item);
+
   store.applyVisibility();
   select(item);
   store.changed();
   return item;
 }
 
-/** Drop a preset pose onto a mannequin. */
+/**
+ * Drop a preset pose onto a mannequin, then set it back on the floor.
+ *
+ * Posing rotates joints, which moves the feet: sitting lifted the figure
+ * 40 cm into the air and walking sank it 35 mm into the ground. A figure
+ * that does not touch the floor has no contact shadow and reads as
+ * floating in every export.
+ */
 export function setPose(item, poseId){
   if (!item?.joints) return;
   applyPose(item.joints, poseById(poseId));
   item.params.pose = poseId;
+  item.obj.updateMatrixWorld(true);
+  restOnGround(item);
   refreshOutline();
 }
 
@@ -392,6 +404,13 @@ export function refreshOutline(){
 
 const ray = new THREE.Raycaster();
 
+/**
+ * Line hits use a radius, and the default is 1 world unit — a metre-wide
+ * tube around every helper line in a scene where the subject is 66 mm
+ * across. That made light helpers swallow essentially every click.
+ */
+ray.params.Line.threshold = 0.004;
+
 /** Raycast at a pointer position; select whatever is under it. */
 export function pickAt(clientX, clientY){
   const ndc = pointerToNDC(clientX, clientY);
@@ -421,12 +440,38 @@ export function pickAt(clientX, clientY){
   }
 
   const hit = ray.intersectObjects(targets, true)[0];
+
+  // Clicking empty space clears the selection.
   if (!hit){ select(null); return; }
 
-  const item = store.itemForDescendant(hit.object)
-            || store.state.items.find(i => i.helper === hit.object)
-            || null;
-  select(item);
+  const item = resolveHit(hit.object);
+
+  // A hit we cannot attribute to anything must not clear the selection —
+  // silently deselecting on a click that plainly landed on something is
+  // far more confusing than doing nothing.
+  if (item) select(item);
+}
+
+/**
+ * Walk up from whatever the ray struck to the item that owns it.
+ *
+ * Helpers are containers: SpotLightHelper keeps its cone in a child
+ * LineSegments, RectAreaLightHelper its outline in a child Mesh. Comparing
+ * the struck object against `item.helper` therefore never matched, and the
+ * click fell through to a deselect.
+ */
+function resolveHit(object3D){
+  let node = object3D;
+  while (node){
+    const owned = store.itemFor(node);
+    if (owned) return owned;
+
+    const viaHelper = store.state.items.find(i => i.helper === node);
+    if (viaHelper) return viaHelper;
+
+    node = node.parent;
+  }
+  return null;
 }
 
 /* ---------------- destruction ---------------- */
@@ -441,6 +486,9 @@ function disposeObject3D(root){
 
 export function destroyItem(item){
   if (!item || item.locked) return false;
+
+  // Never leave the viewport pointed at a camera that no longer exists.
+  if (item.kind === 'camera' && item.isActiveView) lookThrough(null);
 
   if (store.state.selected === item) select(null);
 
@@ -673,11 +721,19 @@ export function resizeItem(item, axis, metresWanted, proportional = true){
   return true;
 }
 
-/** Drop an object back onto the floor after a resize. */
+/**
+ * Drop an object back onto the floor.
+ *
+ * Skips anything the catalog marks as floating — a cloud belongs in the
+ * air, and resizing one should not slam it to the ground.
+ */
 export function restOnGround(item){
   if (!item) return false;
+  if (catalogItem(item.sub)?.rest === 'float') return false;
+
   _sizeBox.setFromObject(item.obj);
   if (_sizeBox.isEmpty()) return false;
+
   item.obj.position.y -= _sizeBox.min.y;
   item.obj.updateMatrixWorld(true);
   refreshOutline();

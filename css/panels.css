@@ -39,7 +39,18 @@
 
 .hud{ position:absolute; z-index:10 }
 
-.hud-tl{ top:14px; left:14px;  display:flex; align-items:center; gap:9px }
+/* Both bars are absolutely positioned, so on a narrow window they used to
+   run straight through each other — at 700px the right-hand pills sat on
+   top of the Orbit toggle and it could not be clicked at all. Anchoring
+   the left bar's right edge makes them share the row instead. */
+.hud-tl{
+  top:14px; left:14px; right:14px;
+  display:flex; align-items:center; gap:9px;
+  flex-wrap:wrap;
+  padding-right:190px;          /* room for the right-hand bar */
+  pointer-events:none;
+}
+.hud-tl > *{ pointer-events:auto }
 .hud-tr{ top:14px; right:14px; display:flex; align-items:center; gap:9px }
 .hud-bl{ bottom:14px; left:14px }
 
@@ -231,9 +242,22 @@
   .hud-left, .hud-right{ width:200px }
   .hud-right{ width:236px }
 }
+/* The readout is the first thing to go when the row gets tight: it is
+   duplicated by the panels, unlike the controls beside it. */
+@media (max-width:940px){
+  #viewReadout{ display:none }
+  .hud-tl .pill:has(#viewReadout){ display:none }
+}
+
 @media (max-width:860px){
-  .hud-left{ display:none }
-  .hud-right{ top:56px; width:216px }
+  .hud-left{
+    /* Do not hide the only way to add or select an object. Narrow it and
+       let it scroll instead. */
+    width:168px;
+    top:104px;
+  }
+  .hud-right{ top:104px; width:216px }
+  .hud-tl{ padding-right:14px }
 }
 
 /* ---------------- pill button ---------------- */

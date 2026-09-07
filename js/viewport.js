@@ -272,8 +272,17 @@ function stepPivotTween(){
   if (k >= 1) pivotTween = null;
 }
 
-/** A drag should win over an in-flight tween. */
-orbit.addEventListener('start', () => { pivotTween = null; });
+/**
+ * A drag takes over from an in-flight tween — but by finishing it, not by
+ * abandoning it. Dropping it partway left the pivot stranded between the
+ * old object and the new one, so orbiting turned around neither.
+ */
+orbit.addEventListener('start', () => {
+  if (!pivotTween) return;
+  orbit.target.copy(pivotTween.toTarget);
+  activeCam.position.copy(pivotTween.toCamera);
+  pivotTween = null;
+});
 
 /* ---------------- render loop ---------------- */
 

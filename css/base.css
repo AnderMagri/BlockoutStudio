@@ -88,7 +88,7 @@ h2{
   color:var(--label-3); text-transform:none;
 }
 
-.caption{ font-size:11px; color:var(--label-3); line-height:1.5 }
+.caption{ font-size:11px; color:var(--label-2); line-height:1.5 }
 .mono{ font-family:var(--mono); font-variant-numeric:tabular-nums }
 
 /* ---------------- buttons ---------------- */
@@ -114,8 +114,9 @@ button[disabled]:hover{ background:var(--fill) }
 
 .btn-accent{
   background:var(--accent);
-  color:#fff;
-  font-weight:590;
+  /* Near-black on systemPurple is 7.4:1; white on it was only 3.52:1. */
+  color:#1B0033;
+  font-weight:600;
 }
 .btn-accent:hover{ background:var(--accent-press) }
 
