@@ -293,7 +293,7 @@ export function applyPose(joints, pose){
 const HANDLE_R = 0.028;
 const handleGeo = new THREE.SphereGeometry(HANDLE_R, 16, 12);
 const handleMat = new THREE.MeshBasicMaterial({
-  color:0xFF9F0A, depthTest:false, transparent:true, opacity:0.85
+  color:0xBF5AF2, depthTest:false, transparent:true, opacity:0.85
 });
 const handleMatOn = new THREE.MeshBasicMaterial({ color:0xffffff, depthTest:false });
 

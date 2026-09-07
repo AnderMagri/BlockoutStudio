@@ -1,20 +1,20 @@
 /* ============================================================
    base.css — tokens, reset, typography, controls.
 
-   Follows macOS dark-mode conventions: system greys, vibrancy over
-   content, 0.5px hairlines, SF type scale, and Apple's own systemOrange
-   as the accent (it suits a lighting tool better than blue).
+   Follows macOS dark-mode conventions: neutral greys, vibrancy over
+   content, 0.5px hairlines, SF type scale, and Apple's systemPurple as
+   the accent.
    ============================================================ */
 
 :root{
   /* materials */
-  --stage:          #0b0b0d;
-  --panel:          rgba(30, 30, 32, 0.72);
-  --panel-solid:    #1c1c1e;
-  --menu:           rgba(44, 44, 46, 0.80);
-  --fill:           rgba(118, 118, 128, 0.24);
-  --fill-strong:    rgba(118, 118, 128, 0.36);
-  --fill-selected:  rgba(110, 110, 115, 0.90);
+  --stage:          #0A0A0A;
+  --panel:          rgba(26, 26, 26, 0.74);
+  --panel-solid:    #171717;
+  --menu:           rgba(38, 38, 38, 0.82);
+  --fill:           rgba(122, 122, 122, 0.22);
+  --fill-strong:    rgba(122, 122, 122, 0.34);
+  --fill-selected:  rgba(112, 112, 112, 0.90);
 
   /* hairlines */
   --hairline:       rgba(255, 255, 255, 0.10);
@@ -22,12 +22,12 @@
 
   /* labels — macOS opacity ladder */
   --label:          rgba(255, 255, 255, 0.92);
-  --label-2:        rgba(235, 235, 245, 0.60);
-  --label-3:        rgba(235, 235, 245, 0.35);
+  --label-2:        rgba(240, 240, 240, 0.60);
+  --label-3:        rgba(240, 240, 240, 0.34);
 
-  /* accents — Apple system colours, dark variants */
-  --accent:         #FF9F0A;
-  --accent-press:   #E08c00;
+  /* accent — systemPurple, dark variant */
+  --accent:         #BF5AF2;
+  --accent-press:   #A64BDB;
   --blue:           #0A84FF;
   --red:            #FF453A;
 
@@ -110,7 +110,7 @@ button[disabled]:hover{ background:var(--fill) }
 
 .btn-accent{
   background:var(--accent);
-  color:#231400;
+  color:#fff;
   font-weight:590;
 }
 .btn-accent:hover{ background:var(--accent-press) }
@@ -139,7 +139,7 @@ select, input[type=text], input[type=number], textarea{
 }
 select{
   padding-right:24px;
-  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='14' viewBox='0 0 10 14'><path d='M5 1.5 8 5H2z' fill='rgba(235,235,245,.5)'/><path d='M5 12.5 2 9h6z' fill='rgba(235,235,245,.5)'/></svg>");
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='14' viewBox='0 0 10 14'><path d='M5 1.5 8 5H2z' fill='rgba(240,240,240,.5)'/><path d='M5 12.5 2 9h6z' fill='rgba(240,240,240,.5)'/></svg>");
   background-repeat:no-repeat;
   background-position:right 7px center;
   cursor:pointer;
@@ -164,7 +164,7 @@ input[type=range]:active{ cursor:grabbing }
 
 input[type=range]::-webkit-slider-runnable-track{
   height:4px; border-radius:2px;
-  background:rgba(120,120,128,.34);
+  background:rgba(122,122,122,.32);
 }
 input[type=range]::-webkit-slider-thumb{
   -webkit-appearance:none;
@@ -174,7 +174,7 @@ input[type=range]::-webkit-slider-thumb{
   margin-top:-6.5px;
 }
 input[type=range]::-moz-range-track{
-  height:4px; border-radius:2px; background:rgba(120,120,128,.34);
+  height:4px; border-radius:2px; background:rgba(122,122,122,.32);
 }
 input[type=range]::-moz-range-thumb{
   width:17px; height:17px; border:none; border-radius:50%;
@@ -195,7 +195,7 @@ input[type=range]:focus-visible::-webkit-slider-thumb{
   appearance:none; -webkit-appearance:none;
   position:relative; flex:none;
   width:38px; height:22px; border-radius:var(--r-pill);
-  background:rgba(120,120,128,.32);
+  background:rgba(122,122,122,.32);
   transition:background .2s ease;
   cursor:pointer;
 }
@@ -205,7 +205,7 @@ input[type=range]:focus-visible::-webkit-slider-thumb{
   background:#fff; box-shadow:var(--shadow-thumb);
   transition:transform .2s cubic-bezier(.3,.8,.4,1);
 }
-.switch input:checked{ background:#30D158 }
+.switch input:checked{ background:var(--accent) }
 .switch input:checked::after{ transform:translateX(16px) }
 .switch input:focus-visible{ outline:2.5px solid var(--blue); outline-offset:2px }
 

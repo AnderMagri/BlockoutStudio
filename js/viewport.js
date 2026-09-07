@@ -34,7 +34,7 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.setClearColor(0x0f1114, 1);
+renderer.setClearColor(0x0D0D0D, 1);
 viewportEl.appendChild(renderer.domElement);
 
 RectAreaLightUniformsLib.init();   // required before any RectAreaLight is used
@@ -42,7 +42,7 @@ RectAreaLightUniformsLib.init();   // required before any RectAreaLight is used
 /* ---------------- scene ---------------- */
 
 export const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x16181c);
+scene.background = new THREE.Color(0x141414);
 
 /** Everything in here is hidden during any export: grid, gizmo, helpers. */
 export const helpers = new THREE.Group();
@@ -74,7 +74,7 @@ backdrop.position.set(0, 2.5, -1.2);
 backdrop.receiveShadow = true;
 scene.add(backdrop);
 
-export const grid = new THREE.GridHelper(2, 40, 0x3a3f46, 0x2a2e34);
+export const grid = new THREE.GridHelper(2, 40, 0x3A3A3A, 0x2A2A2A);
 grid.position.y = 0.0006;
 helpers.add(grid);
 
@@ -175,7 +175,7 @@ window.addEventListener('resize', resize);
 
 /* ---------------- render loop ---------------- */
 
-const clearColor = new THREE.Color(0x0f1114);
+const clearColor = new THREE.Color(0x0D0D0D);
 let onBeforeRender = null;
 export const setBeforeRender = fn => { onBeforeRender = fn; };
 

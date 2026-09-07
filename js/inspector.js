@@ -220,7 +220,7 @@ function mannequinControls(host, item){
     p => setPose(item, p.id));
 
   host.appendChild(el('p', 'caption',
-    'Click any orange joint to grab it — the gizmo switches to rotate, and ' +
+    'Click any purple joint to grab it — the gizmo switches to rotate, and ' +
     'everything below that joint follows.'));
 }
 

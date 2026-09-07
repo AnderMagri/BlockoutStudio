@@ -47,9 +47,10 @@
   <div class="hud hud-tr">
     <div class="pill">
       <label class="sr-only" for="aspect">Aspect ratio</label>
-      <select id="aspect" title="Export aspect ratio"></select>
-      <label class="sr-only" for="resolution">Export resolution</label>
-      <select id="resolution" title="Export resolution"></select>
+      <select id="aspect" title="Framing and export aspect ratio"></select>
+    </div>
+    <div class="pill tight">
+      <button class="pill-btn" id="exportBtn">Export…</button>
     </div>
   </div>
 
@@ -78,32 +79,6 @@
       <h2>Lighting rig</h2>
       <div class="gallery" id="lightGallery"></div>
       <p class="caption">Replaces the lights in the Lighting layer. Select any light afterwards to adjust it.</p>
-    </section>
-
-    <section class="panel">
-      <h2>Export</h2>
-      <div class="stack">
-        <button class="btn-accent" data-export="render">Render</button>
-        <div class="grid-2">
-          <button data-export="depth">Depth</button>
-          <button data-export="normal">Normal</button>
-        </div>
-        <button data-export="mask">Active layer mask</button>
-      </div>
-
-      <details class="opts">
-        <summary>Depth options</summary>
-        <label class="switch">Fit range to subject
-          <input type="checkbox" id="depthSubjectOnly" checked></label>
-        <label class="switch">Invert (near = black)
-          <input type="checkbox" id="depthInvert"></label>
-        <p class="caption">Default is near&nbsp;=&nbsp;white, the convention Krea and ControlNet depth expect.</p>
-      </details>
-
-      <div class="stack" style="margin-top:9px">
-        <button id="genPrompt">Describe this setup…</button>
-        <button class="btn-quiet" id="sceneJson">Scene JSON…</button>
-      </div>
     </section>
 
   </aside>

@@ -22,7 +22,7 @@ import {
   FORMATS, ASPECTS, RESOLUTIONS, SHOTS,
   focalFromEquiv, depthOfField
 } from './optics.js';
-import { exportRender, exportDepth, exportNormal, exportMask } from './export.js';
+import { exportRender, exportDepth, exportNormal, exportMask, exportSize } from './export.js';
 import { buildPrompt } from './prompt.js';
 import { renderLayers } from './layers.js';
 import { renderInspector } from './inspector.js';
@@ -161,28 +161,113 @@ function markRig(id){
 
 /* ---------------- export ---------------- */
 
-const longEdge = () => +$('resolution').value;
+/* Export settings live here rather than in the DOM: the controls only exist
+   while the modal is open, but the scene API can set them at any time. */
+let exportRes   = 1536;
+let depthSubject = true;
+let depthInvert  = false;
+
+const longEdge = () => exportRes;
 
 function buildExportControls(){
   fillSelect($('aspect'), ASPECTS.map(a => ({ value:a.id, label:a.label })), '4:5');
   $('aspect').onchange = e => { setAspect(e.target.value); syncReadout(); };
   setAspect('4:5');
 
-  fillSelect($('resolution'), RESOLUTIONS.map(r => ({ value:r, label:`${r} px` })), 1536);
+  $('exportBtn').onclick = openExportModal;
+}
 
-  for (const b of document.querySelectorAll('[data-export]')){
-    b.onclick = () => {
-      switch (b.dataset.export){
-        case 'render': exportRender(longEdge()); break;
-        case 'depth':  exportDepth(longEdge(), {
-                         subjectOnly: $('depthSubjectOnly').checked,
-                         invert:      $('depthInvert').checked
-                       }); break;
-        case 'normal': exportNormal(longEdge()); break;
-        case 'mask':   exportMask(longEdge()); break;
-      }
-    };
+const PASSES = [
+  { id:'render', name:'Render',      note:'The lit scene as you see it',        cls:'btn-accent' },
+  { id:'depth',  name:'Depth map',   note:'Linear depth, near = white' },
+  { id:'normal', name:'Normal map',  note:'Surface normals' },
+  { id:'mask',   name:'Layer mask',  note:'Active layer white, rest black' }
+];
+
+function runPass(id){
+  switch (id){
+    case 'render': exportRender(longEdge()); break;
+    case 'depth':  exportDepth(longEdge(), { subjectOnly:depthSubject, invert:depthInvert }); break;
+    case 'normal': exportNormal(longEdge()); break;
+    case 'mask':   exportMask(longEdge()); break;
   }
+}
+
+function openExportModal(){
+  openModal({
+    title:'Export',
+    subtitle:'Everything renders from the active camera, cropped to the frame you see.',
+    build(body, close){
+      /* ---- size ---- */
+      const sizeRow = el('div', 'modal-row');
+
+      const aspectSel = el('select');
+      fillSelect(aspectSel, ASPECTS.map(a => ({ value:a.id, label:a.label })), getAspect().id);
+
+      const resSel = el('select');
+      fillSelect(resSel, RESOLUTIONS.map(r => ({ value:r, label:`${r} px long edge` })), exportRes);
+
+      const px = el('span', 'val mono');
+      const refreshPx = () => {
+        const { width, height } = exportSize(exportRes);
+        px.textContent = `${width} × ${height}`;
+      };
+
+      aspectSel.onchange = e => {
+        $('aspect').value = e.target.value;
+        setAspect(e.target.value);
+        syncReadout();
+        refreshPx();
+      };
+      resSel.onchange = e => { exportRes = +e.target.value; refreshPx(); };
+
+      sizeRow.append(aspectSel, resSel, px);
+      body.appendChild(sizeRow);
+      refreshPx();
+
+      /* ---- passes ---- */
+      const list = el('div', 'pass-list');
+      for (const pass of PASSES){
+        const row = el('button', 'pass ' + (pass.cls || ''));
+        const text = el('span', 'pass-text');
+        text.appendChild(el('span', 'pass-name', pass.name));
+        text.appendChild(el('span', 'pass-note', pass.note));
+        row.appendChild(text);
+        row.appendChild(el('span', 'pass-go', '↓'));
+        row.onclick = () => runPass(pass.id);
+        list.appendChild(row);
+      }
+      body.appendChild(list);
+
+      /* ---- depth options ---- */
+      const opts = el('details', 'opts');
+      const sum = el('summary', null, 'Depth options');
+      opts.appendChild(sum);
+
+      const mk = (label, checked, onChange) => {
+        const l = el('label', 'switch');
+        l.appendChild(document.createTextNode(label));
+        const cb = el('input'); cb.type = 'checkbox'; cb.checked = checked;
+        cb.onchange = () => onChange(cb.checked);
+        l.appendChild(cb);
+        opts.appendChild(l);
+      };
+      mk('Fit range to subject', depthSubject, v => { depthSubject = v; });
+      mk('Invert (near = black)', depthInvert,  v => { depthInvert = v; });
+      opts.appendChild(el('p', 'caption',
+        'Default is near = white, the convention Krea and ControlNet depth expect.'));
+      body.appendChild(opts);
+
+      /* ---- text outputs ---- */
+      const row = el('div', 'grid-2');
+      const a = el('button', null, 'Describe setup…');
+      a.onclick = () => { close(); openPromptSheet(); };
+      const b = el('button', 'btn-quiet', 'Scene JSON…');
+      b.onclick = () => { close(); openSceneSheet(); };
+      row.append(a, b);
+      body.appendChild(row);
+    }
+  });
 }
 
 /* ---------------- sheets ---------------- */
@@ -221,13 +306,41 @@ function openSheet({ title, subtitle, value, actions }){
   return { close, textarea: ta };
 }
 
+/** A modal whose body is built by a callback — used by the export panel. */
+function openModal({ title, subtitle, build }){
+  const backdrop = el('div', 'sheet-backdrop');
+  const sheet = el('div', 'sheet sheet-auto');
+  const close = () => backdrop.remove();
+
+  sheet.appendChild(el('h1', null, title));
+  if (subtitle) sheet.appendChild(el('p', 'sheet-sub', subtitle));
+
+  const body = el('div', 'modal-body');
+  build(body, close);
+  sheet.appendChild(body);
+
+  const row = el('div', 'sheet-actions');
+  const done = el('button', 'btn-quiet', 'Done');
+  done.onclick = close;
+  row.appendChild(done);
+  sheet.appendChild(row);
+
+  backdrop.appendChild(sheet);
+  backdrop.onclick = e => { if (e.target === backdrop) close(); };
+  document.addEventListener('keydown', function esc(e){
+    if (e.key === 'Escape'){ close(); document.removeEventListener('keydown', esc); }
+  });
+  document.body.appendChild(backdrop);
+  return { close };
+}
+
 async function copyText(text){
   try { await navigator.clipboard.writeText(text); toast('Copied to clipboard'); }
   catch { toast('Press ⌘C to copy', true); }
 }
 
-function buildPromptSheet(){
-  $('genPrompt').onclick = () => {
+function openPromptSheet(){
+  {
     const p = currentParams();
     const format = currentFormat();
     const focalReal = focalFromEquiv(p.equiv, format);
@@ -251,11 +364,11 @@ function buildPromptSheet(){
         { label:'Copy', cls:'btn-accent', run:(ta) => copyText(ta.value) }
       ]
     });
-  };
+  }
 }
 
-function buildSceneSheet(){
-  $('sceneJson').onclick = () => {
+function openSceneSheet(){
+  {
     const api = window.BlockoutStudio;
     openSheet({
       title:'Scene JSON',
@@ -274,7 +387,7 @@ function buildSceneSheet(){
           } }
       ]
     });
-  };
+  }
 }
 
 /* ---------------- input ---------------- */
@@ -336,7 +449,7 @@ const apiHooks = {
       setAspect(spec.aspect);
     }
     if (spec.resolution && RESOLUTIONS.includes(+spec.resolution)){
-      $('resolution').value = spec.resolution;
+      exportRes = +spec.resolution;
     }
     syncReadout();
   },
@@ -377,8 +490,6 @@ export function initUI(){
   buildAddMenu();
   buildRigGallery();
   buildExportControls();
-  buildPromptSheet();
-  buildSceneSheet();
   buildInput();
 
   $('addLayer').onclick = () => {

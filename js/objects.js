@@ -24,7 +24,7 @@ import { toast } from './util.js';
 
 /* ---------------- selection outline ---------------- */
 
-const outline = new THREE.BoxHelper(undefined, 0xe8a33d);
+const outline = new THREE.BoxHelper(undefined, 0xBF5AF2);
 outline.visible = false;
 helpers.add(outline);
 

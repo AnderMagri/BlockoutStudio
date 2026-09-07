@@ -86,7 +86,7 @@ export function makeLight(p = {}){
       configureShadow(light, params, 2.2);
       target = light.target;
       target.position.copy(AIM);
-      helper = new THREE.DirectionalLightHelper(light, 0.12, 0xe8a33d);
+      helper = new THREE.DirectionalLightHelper(light, 0.12, 0xBF5AF2);
       break;
     }
 
@@ -106,7 +106,7 @@ export function makeLight(p = {}){
       light = new THREE.PointLight(colour, params.power * params.dist * params.dist, 0, 2);
       light.position.copy(pos);
       configureShadow(light, params, 1.0);
-      helper = new THREE.PointLightHelper(light, 0.02, 0xe8a33d);
+      helper = new THREE.PointLightHelper(light, 0.02, 0xBF5AF2);
       break;
     }
 
@@ -130,7 +130,7 @@ export function makeLight(p = {}){
       configureShadow(light, params, 1.4);
       target = light.target;
       target.position.copy(AIM);
-      helper = new THREE.SpotLightHelper(light, 0xe8a33d);
+      helper = new THREE.SpotLightHelper(light, 0xBF5AF2);
       break;
     }
   }

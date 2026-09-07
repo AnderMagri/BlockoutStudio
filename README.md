@@ -47,7 +47,7 @@ drops real light objects into the Lighting layer; select any one to change
 its colour temperature, power, angle or softness.
 
 **The mannequin** is a joint hierarchy, not a skinned mesh. Click any
-orange joint to grab it — the gizmo switches to rotate and everything
+purple joint to grab it — the gizmo switches to rotate and everything
 below that joint follows. Seven preset poses to start from.
 
 ---
@@ -60,6 +60,9 @@ below that joint follows. Seven preset poses to start from.
 | **Depth** | Linear view-space depth, near = white |
 | **Normal** | Surface normals |
 | **Mask** | The active layer white, everything else black |
+
+All four live behind **Export…** in the top bar, along with the aspect
+ratio, output size and the setup description.
 
 Two things make the depth pass actually usable, and both are easy to get
 wrong:
@@ -82,9 +85,9 @@ exactly what you get.
 
 ## Driving it from a conversation
 
-Open **Scene JSON**, copy what's there, and paste it to an assistant along
-with what you want changed. Paste the JSON it gives back and press
-**Build**.
+Open **Export… → Scene JSON**, copy what's there, and paste it to an
+assistant along with what you want changed. Paste the JSON it gives back
+and press **Build**.
 
 ```json
 {

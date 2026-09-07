@@ -13,7 +13,7 @@ import { clayMaterial } from './material.js';
 
 const HANDLE_RADIUS = 0.007;
 
-const handleMat       = new THREE.MeshBasicMaterial({ color:0xe8a33d, depthTest:false });
+const handleMat       = new THREE.MeshBasicMaterial({ color:0xBF5AF2, depthTest:false });
 const handleMatActive = new THREE.MeshBasicMaterial({ color:0xffffff, depthTest:false });
 const handleGeo       = new THREE.SphereGeometry(HANDLE_RADIUS, 16, 12);
 
