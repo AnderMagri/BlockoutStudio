@@ -230,6 +230,51 @@ export function resize(){
 
 window.addEventListener('resize', resize);
 
+/* ---------------- orbit pivot ---------------- */
+
+let pivotTween = null;
+
+/**
+ * Move what the camera orbits around.
+ *
+ * `keepFraming` translates the camera by the same delta, so the view
+ * direction and distance are preserved and the picture pans rather than
+ * swinging round to face the new pivot. That is the difference between
+ * "this is now the centre of rotation" and "look at this", and the first
+ * is far less disorienting when you are only clicking things to inspect
+ * them.
+ *
+ * Tweened over a few frames because an instant pan reads as a glitch.
+ */
+export function focusOrbitOn(point, { keepFraming = true, ms = 260 } = {}){
+  const fromTarget = orbit.target.clone();
+  const toTarget   = point.clone();
+
+  const fromCamera = activeCam.position.clone();
+  const toCamera   = keepFraming
+    ? fromCamera.clone().add(toTarget.clone().sub(fromTarget))
+    : fromCamera.clone();
+
+  if (fromTarget.distanceToSquared(toTarget) < 1e-10){ pivotTween = null; return; }
+
+  pivotTween = { fromTarget, toTarget, fromCamera, toCamera, start: performance.now(), ms };
+}
+
+function stepPivotTween(){
+  if (!pivotTween) return;
+
+  const k = Math.min((performance.now() - pivotTween.start) / pivotTween.ms, 1);
+  const e = k * k * (3 - 2 * k);                 // smoothstep
+
+  orbit.target.lerpVectors(pivotTween.fromTarget, pivotTween.toTarget, e);
+  activeCam.position.lerpVectors(pivotTween.fromCamera, pivotTween.toCamera, e);
+
+  if (k >= 1) pivotTween = null;
+}
+
+/** A drag should win over an in-flight tween. */
+orbit.addEventListener('start', () => { pivotTween = null; });
+
 /* ---------------- render loop ---------------- */
 
 const clearColor = new THREE.Color(0x0D0D0D);
@@ -258,6 +303,7 @@ function renderFrame(){
 
 export function tick(){
   requestAnimationFrame(tick);
+  stepPivotTween();
   orbit.update();
   if (onBeforeRender) onBeforeRender();
   renderFrame();

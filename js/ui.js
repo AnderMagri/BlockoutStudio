@@ -14,7 +14,8 @@ import {
 } from './viewport.js';
 import {
   addFromCatalog, applyRig, select, duplicateSelected, destroySelected,
-  pickAt, lookThrough, frameSubject, applyCameraParams, setCompositionMode, setSetMode
+  pickAt, lookThrough, frameSubject, applyCameraParams, setCompositionMode, setSetMode,
+  setOrbitAroundSelection, orbitMode, focusSelection
 } from './objects.js';
 import { CATEGORIES } from './catalog.js';
 import { thumbnails, GLYPHS } from './thumbnails.js';
@@ -473,6 +474,28 @@ function openSceneSheet(){
   }
 }
 
+/* ---------------- orbit pivot ---------------- */
+
+function renderPivotBtn(){
+  const b = $('pivotBtn');
+  if (!b) return;
+  const on = orbitMode();
+  b.textContent = on ? '⊙ Orbit: selection' : '⊙ Orbit: scene';
+  b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  b.title = on
+    ? 'Selecting something makes it the centre of rotation. Click to orbit the whole scene instead.'
+    : 'Orbiting turns around the scene. Click to orbit whatever you select.';
+}
+
+function buildPivotToggle(){
+  $('pivotBtn').onclick = () => {
+    setOrbitAroundSelection(!orbitMode());
+    renderPivotBtn();
+    toast(orbitMode() ? 'Orbiting around the selection' : 'Orbiting around the scene');
+  };
+  renderPivotBtn();
+}
+
 /* ---------------- scenes ---------------- */
 
 const ago = iso => {
@@ -615,7 +638,10 @@ function buildInput(){
     switch (e.key.toLowerCase()){
       case 'd': duplicateSelected(); break;
       case 'x': destroySelected(); break;
-      case 'f': frameSubject(activeCamera()); break;
+      // F frames what you have selected, or the whole scene when nothing is.
+      case 'f':
+        if (!focusSelection({ keepFraming: false })) frameSubject(activeCamera());
+        break;
       case 'escape': select(null); break;
       case 'backspace':
       case 'delete': destroySelected(); e.preventDefault(); break;
@@ -723,6 +749,7 @@ export function applyShot(shot){
 export function initUI(){
   $('addBtn').onclick = openObjectPicker;
   $('scenesBtn').onclick = openScenesPanel;
+  buildPivotToggle();
   buildSetControl();
   buildCompositionToggle();
   buildRigGallery();

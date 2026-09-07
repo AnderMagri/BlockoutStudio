@@ -13,7 +13,7 @@ import * as store from './store.js';
 import {
   duplicateSelected, destroySelected, updateLight, updateTextObject,
   applyCameraParams, lookThrough, refreshOutline, setPose, frameSubject,
-  setCameraLock
+  setCameraLock, measureItem, resizeItem, restOnGround
 } from './objects.js';
 import { gizmo, activeCamera, renderer } from './viewport.js';
 import { rebuildSpline, addControlPoint, removeControlPoint } from './spline.js';
@@ -24,8 +24,13 @@ import {
 } from './optics.js';
 import { LIGHT_TYPES } from './lights.js';
 import { $, el, fillSelect, metres, mm, kelvinName } from './util.js';
+import { UNIT_LIST, unit, setUnit, value as unitValue, parse as parseLength } from './units.js';
 
 let lastId = null;
+
+/* Module scope on purpose: the inspector rebuilds after every resize, so a
+   local would silently flip this back on between one edit and the next. */
+let keepProportions = true;
 
 /* ---------------- builders ---------------- */
 
@@ -155,7 +160,73 @@ function meshControls(host, item){
   if (item.sub === 'text')      textControls(host, item);
   if (item.sub === 'spline')    splineControls(host, item);
   if (item.sub === 'mannequin') mannequinControls(host, item);
+  dimensionControls(host, item);
   transformControls(host, item);
+}
+
+/**
+ * Real-world size. Everything in the scene is modelled at true scale, so
+ * these are the actual dimensions of the thing — type a number to make an
+ * object exactly that big.
+ */
+function dimensionControls(host, item){
+  const size = measureItem(item);
+  if (!size) return;
+
+  const head = el('h2');
+  head.style.marginTop = '15px';
+  head.appendChild(document.createTextNode('Size'));
+
+  const unitSel = el('select');
+  unitSel.style.cssText = 'width:auto; margin-left:auto; font-size:10px; padding:1px 18px 1px 5px';
+  fillSelect(unitSel, UNIT_LIST.map(u => ({ value:u.id, label:u.label })), unit().id);
+  unitSel.onchange = e => { setUnit(e.target.value); renderInspector(true); };
+  head.appendChild(unitSel);
+  host.appendChild(head);
+
+  const row = el('div', 'grid-3');
+  const fields = {};
+
+  for (const axis of ['x', 'y', 'z']){
+    const wrap = el('div', 'dim');
+    wrap.appendChild(el('span', 'dim-label', { x:'W', y:'H', z:'D' }[axis]));
+
+    const input = el('input');
+    input.type = 'text';
+    input.className = 'dim-input';
+    input.value = unitValue(size[axis]);
+    input.setAttribute('aria-label', { x:'Width', y:'Height', z:'Depth' }[axis]);
+
+    const commit = () => {
+      const metresWanted = parseLength(input.value);
+      if (metresWanted == null || metresWanted <= 0){
+        input.value = unitValue(measureItem(item)[axis]);   // reject, restore
+        return;
+      }
+      resizeItem(item, axis, metresWanted, keepProportions);
+      restOnGround(item);
+      renderInspector(true);
+    };
+    input.onchange = commit;
+    input.onkeydown = e => { if (e.key === 'Enter') commit(); };
+
+    wrap.appendChild(input);
+    row.appendChild(wrap);
+    fields[axis] = input;
+  }
+  host.appendChild(row);
+
+  const keep = el('label', 'switch');
+  keep.appendChild(document.createTextNode('Keep proportions'));
+  const keepBox = el('input');
+  keepBox.type = 'checkbox';
+  keepBox.checked = keepProportions;
+  keepBox.onchange = () => { keepProportions = keepBox.checked; };
+  keep.appendChild(keepBox);
+  host.appendChild(keep);
+
+  host.appendChild(el('p', 'caption',
+    `Real dimensions. The floor grid is ${metres(0.05)} per square.`));
 }
 
 function textControls(host, item){

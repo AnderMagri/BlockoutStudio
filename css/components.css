@@ -292,3 +292,22 @@ input.insp-name::placeholder{ color:var(--label-3) }
 .scene-meta{ font-size:10px; color:var(--label-3) }
 .scene-row .tiny{ flex:none }
 .scene-meta{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+
+/* ---------------- dimensions ---------------- */
+
+.dim{ display:flex; align-items:center; gap:4px; min-width:0 }
+.dim-label{
+  font-size:10px; color:var(--label-3); flex:none;
+  font-weight:590; width:11px;
+}
+input.dim-input{
+  flex:1; min-width:0;
+  background:var(--fill);
+  border:none; border-radius:7px;
+  color:var(--label);
+  font-family:var(--mono); font-size:11px;
+  font-variant-numeric:tabular-nums;
+  padding:4px 5px;
+  text-align:right;
+}
+input.dim-input:focus{ outline:2px solid var(--accent); outline-offset:-1px }

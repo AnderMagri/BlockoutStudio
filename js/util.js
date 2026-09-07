@@ -2,6 +2,8 @@
    util.js — DOM helpers, formatting, colour science, downloads
    ============================================================ */
 
+import { measure } from './units.js';
+
 export const $  = id => document.getElementById(id);
 export const el = (tag, cls, text) => {
   const n = document.createElement(tag);
@@ -12,13 +14,8 @@ export const el = (tag, cls, text) => {
 
 export const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
-/** Metres → a human string that stays readable across three orders of magnitude. */
-export function metres(m){
-  const abs = Math.abs(m);
-  if (abs < 0.01)  return `${(m * 1000).toFixed(1)} mm`;
-  if (abs < 1)     return `${(m * 100).toFixed(1)} cm`;
-  return `${m.toFixed(2)} m`;
-}
+/** Metres → a display string in whatever unit the user has chosen. */
+export const metres = m => measure(m);
 
 /** Millimetres → readable string, used by the depth-of-field readout. */
 export function mm(v){

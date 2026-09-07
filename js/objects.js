@@ -10,7 +10,8 @@ import * as THREE from 'three';
 import * as store from './store.js';
 import {
   scene, helpers, extraHelpers, gizmo, orbit,
-  ground, backdrop, cyclorama, freeCamera, activeCamera, setActiveCamera, pointerToNDC
+  ground, backdrop, cyclorama, freeCamera, activeCamera, setActiveCamera,
+  pointerToNDC, focusOrbitOn
 } from './viewport.js';
 import { makeCatalogObject, labelFor, catalogItem } from './catalog.js';
 import { makeMannequin, buildJointHandles, highlightJointHandle, applyPose, poseById } from './figure.js';
@@ -340,6 +341,12 @@ export function select(item, handleMesh = null){
   // layer, the next primitive you added would silently land there too.
   // The active layer is changed by clicking a layer header, nothing else.
 
+  if (orbitAroundSelection){
+    // Pivot on what was just picked, without swinging the view around.
+    const point = handleMesh ? handleMesh.getWorldPosition(new THREE.Vector3()) : centerOf(item);
+    if (point) focusOrbitOn(point, { keepFraming: true });
+  }
+
   if (item.spline){
     setHandlesVisible(item.spline, true);
     highlightHandle(item.spline, handleMesh);
@@ -592,6 +599,134 @@ export function updateHelpers(){
     if (item.helper && !item.helperIsChild && item.helper.visible) item.helper.update?.();
   }
   if (outline.visible) refreshOutline();
+}
+
+/* ---------------- measurement ---------------- */
+
+const _sizeBox = new THREE.Box3();
+const _sizeV   = new THREE.Vector3();
+const _sizeM   = new THREE.Matrix4();
+
+/**
+ * An object's own width, height and depth in metres.
+ *
+ * Measured in the object's local frame rather than from a world-space
+ * bounding box, because a world box around a rotated bottle is bigger than
+ * the bottle. Turning something 45° must not change its stated size.
+ *
+ * @returns {THREE.Vector3|null} metres along the object's own X, Y, Z
+ */
+export function measureItem(item){
+  if (!item) return null;
+
+  const root = item.obj;
+  root.updateWorldMatrix(true, true);
+  const toLocal = _sizeM.copy(root.matrixWorld).invert();
+
+  _sizeBox.makeEmpty();
+  root.traverse(node => {
+    if (!node.isMesh || !node.geometry) return;
+    if (!node.geometry.boundingBox) node.geometry.computeBoundingBox();
+    const b = node.geometry.boundingBox;
+
+    const m = new THREE.Matrix4().multiplyMatrices(toLocal, node.matrixWorld);
+    for (let i = 0; i < 8; i++){
+      _sizeV.set(
+        (i & 1) ? b.max.x : b.min.x,
+        (i & 2) ? b.max.y : b.min.y,
+        (i & 4) ? b.max.z : b.min.z
+      ).applyMatrix4(m);
+      _sizeBox.expandByPoint(_sizeV);
+    }
+  });
+
+  if (_sizeBox.isEmpty()) return null;
+
+  // Local bounds exclude the root's own scale, so put it back.
+  const local = _sizeBox.getSize(new THREE.Vector3());
+  return local.multiply(root.scale);
+}
+
+/**
+ * Resize an object to an exact real-world measurement.
+ *
+ * @param {string} axis 'x' | 'y' | 'z'
+ * @param {number} metresWanted
+ * @param {boolean} proportional scale the other two axes to match
+ */
+export function resizeItem(item, axis, metresWanted, proportional = true){
+  const size = measureItem(item);
+  if (!size || metresWanted <= 0) return false;
+
+  const current = size[axis];
+  if (!(current > 1e-9)) return false;
+
+  const factor = metresWanted / current;
+  const scale = item.obj.scale;
+
+  if (proportional) scale.multiplyScalar(factor);
+  else scale[axis] *= factor;
+
+  item.obj.updateMatrixWorld(true);
+  fitShadowCameras();
+  refreshOutline();
+  return true;
+}
+
+/** Drop an object back onto the floor after a resize. */
+export function restOnGround(item){
+  if (!item) return false;
+  _sizeBox.setFromObject(item.obj);
+  if (_sizeBox.isEmpty()) return false;
+  item.obj.position.y -= _sizeBox.min.y;
+  item.obj.updateMatrixWorld(true);
+  refreshOutline();
+  return true;
+}
+
+/* ---------------- orbit pivot ---------------- */
+
+/** When on, selecting something makes it the centre of rotation. */
+let orbitAroundSelection = true;
+
+export const orbitMode = () => orbitAroundSelection;
+
+export function setOrbitAroundSelection(on){
+  orbitAroundSelection = !!on;
+  if (orbitAroundSelection) focusSelection({ keepFraming: true });
+  else focusScene();
+  return orbitAroundSelection;
+}
+
+const _centerBox = new THREE.Box3();
+
+/** Where an item's pivot should sit: its geometric centre, or its position. */
+export function centerOf(item){
+  if (!item) return null;
+  if (item.kind === 'light' || item.kind === 'camera') return item.obj.position.clone();
+
+  _centerBox.setFromObject(item.obj);
+  if (_centerBox.isEmpty()) return item.obj.position.clone();
+  return _centerBox.getCenter(new THREE.Vector3());
+}
+
+/** Pivot on the current selection. Silently does nothing with none. */
+export function focusSelection(opts = {}){
+  const point = centerOf(store.state.selected);
+  if (point) focusOrbitOn(point, opts);
+  return !!point;
+}
+
+/** Pivot back on the scene as a whole. */
+export function focusScene(){
+  const items = store.subjectMeshes();
+  if (!items.length){ focusOrbitOn(new THREE.Vector3(0, 0.06, 0)); return; }
+
+  _centerBox.makeEmpty();
+  for (const item of items) _centerBox.expandByObject(item.obj);
+  if (!_centerBox.isEmpty()){
+    focusOrbitOn(_centerBox.getCenter(new THREE.Vector3()));
+  }
 }
 
 /* ---------------- framing ---------------- */

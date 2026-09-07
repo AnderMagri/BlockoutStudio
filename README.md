@@ -97,6 +97,23 @@ exactly what you get.
 
 ---
 
+## Measurements
+
+Everything is modelled at real scale — a 330 ml can really is 66 × 122 mm,
+and the depth-of-field maths depends on that being true.
+
+Select an object and the **Size** block gives its actual width, height and
+depth. Type a number to make it exactly that big; type `120mm` while the
+panel is showing centimetres and it understands. Units are mm, cm, m or
+inches, and the choice applies to every readout in the app. The floor grid
+is 50 mm per square.
+
+Sizes are measured in the object's own frame, so turning something 45°
+does not change its stated size — a world-space bounding box around a
+rotated bottle is bigger than the bottle.
+
+---
+
 ## Saving scenes
 
 **Scenes…** in the top bar. Name the current scene and save it; reopen,
@@ -283,5 +300,11 @@ mcp/
 
 ## Keyboard
 
-`W` move · `E` rotate · `R` scale · `F` fit to subject · `D` duplicate ·
-`X` delete · `Esc` deselect
+`W` move · `E` rotate · `R` scale · `F` frame the selection (or the whole
+scene when nothing is selected) · `D` duplicate · `X` delete · `Esc`
+deselect
+
+**⊙ Orbit** in the top bar switches the centre of rotation between
+whatever you have selected and the scene as a whole. Selecting something
+moves the pivot to it without swinging the view around, so clicking things
+to inspect them stays calm.
