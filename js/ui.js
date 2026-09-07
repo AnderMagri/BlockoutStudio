@@ -28,6 +28,9 @@ import { buildPrompt } from './prompt.js';
 import { renderLayers } from './layers.js';
 import { renderInspector } from './inspector.js';
 import { installGlobalAPI } from './api.js';
+import {
+  listScenes, loadScene, deleteScene, sceneToFile, sceneFromFile, readAutosave
+} from './scenes.js';
 import { $, el, fillSelect, toast } from './util.js';
 
 /* ---------------- shared camera state ---------------- */
@@ -470,6 +473,126 @@ function openSceneSheet(){
   }
 }
 
+/* ---------------- scenes ---------------- */
+
+const ago = iso => {
+  if (!iso) return '';
+  const mins = Math.round((Date.now() - new Date(iso)) / 60000);
+  if (mins < 1)    return 'just now';
+  if (mins < 60)   return `${mins} min ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24)    return `${hrs} h ago`;
+  return `${Math.round(hrs / 24)} d ago`;
+};
+
+function openScenesPanel(){
+  const api = window.BlockoutStudio;
+
+  openModal({
+    title:'Scenes',
+    subtitle:'Saved in this browser. Use Download for anything you want to keep or share.',
+    build(body, close){
+
+      /* ---- save current ---- */
+      const saveRow = el('div', 'modal-row');
+      const nameInput = el('input');
+      nameInput.type = 'text';
+      nameInput.placeholder = 'Name this scene';
+      nameInput.setAttribute('aria-label', 'Scene name');
+
+      const saveBtn = el('button', 'btn-accent', 'Save');
+      saveBtn.style.width = 'auto';
+      saveBtn.onclick = () => {
+        try {
+          const { name } = api.saveScene(nameInput.value);
+          toast(`Saved “${name}”`);
+          nameInput.value = '';
+          repaint();
+        } catch (err){ toast(err.message, true); }
+      };
+      nameInput.onkeydown = e => { if (e.key === 'Enter') saveBtn.click(); };
+
+      saveRow.append(nameInput, saveBtn);
+      body.appendChild(saveRow);
+
+      /* ---- saved list ---- */
+      const list = el('div', 'scene-list');
+      body.appendChild(list);
+
+      function repaint(){
+        list.innerHTML = '';
+        const saved = listScenes();
+
+        if (!saved.length){
+          list.appendChild(el('p', 'caption', 'Nothing saved yet.'));
+        }
+
+        for (const entry of saved){
+          const row = el('div', 'scene-row');
+
+          const text = el('span', 'scene-text');
+          text.appendChild(el('span', 'scene-name', entry.name));
+          text.appendChild(el('span', 'scene-meta',
+            `${entry.objects} object${entry.objects === 1 ? '' : 's'} · ${ago(entry.savedAt)}`));
+          row.appendChild(text);
+
+          const open = el('button', 'tiny', 'Open');
+          open.onclick = async () => {
+            close();
+            try { await api.loadScene(entry.name); toast(`Opened “${entry.name}”`); }
+            catch (err){ toast(err.message, true); }
+          };
+
+          const dl = el('button', 'tiny', '↓');
+          dl.title = 'Download as a file';
+          dl.onclick = () => {
+            try { sceneToFile(loadScene(entry.name), entry.name); }
+            catch (err){ toast(err.message, true); }
+          };
+
+          const del = el('button', 'tiny btn-danger', '×');
+          del.title = 'Delete';
+          del.onclick = () => { deleteScene(entry.name); repaint(); };
+
+          row.append(open, dl, del);
+          list.appendChild(row);
+        }
+      }
+
+      repaint();
+
+      /* ---- file in and out ---- */
+      const files = el('div', 'grid-2');
+      const imp = el('button', null, 'Import file…');
+      imp.onclick = async () => {
+        try {
+          const { scene, name } = await sceneFromFile();
+          close();
+          await api.applyScene(scene);
+          toast(`Opened “${name}”`);
+        } catch (err){ toast(err.message, true); }
+      };
+      const exp = el('button', null, 'Download current');
+      exp.onclick = () => sceneToFile(api.serializeScene(), 'blockout-scene');
+      files.append(imp, exp);
+      body.appendChild(files);
+
+      /* ---- recovery ---- */
+      const auto = readAutosave();
+      if (auto){
+        const recover = el('button', 'btn-quiet',
+          `Restore last session (${ago(auto.savedAt)})`);
+        recover.onclick = async () => {
+          close();
+          await api.applyScene(auto.scene);
+          toast('Restored your last session');
+        };
+        body.appendChild(recover);
+      }
+    }
+  });
+}
+
 /* ---------------- input ---------------- */
 
 function buildInput(){
@@ -599,6 +722,7 @@ export function applyShot(shot){
 
 export function initUI(){
   $('addBtn').onclick = openObjectPicker;
+  $('scenesBtn').onclick = openScenesPanel;
   buildSetControl();
   buildCompositionToggle();
   buildRigGallery();

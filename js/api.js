@@ -44,6 +44,7 @@ import { POSES } from './figure.js';
 import { RIGS } from './lights.js';
 import { LENSES, SHOTS, ASPECTS, RESOLUTIONS, FORMATS } from './optics.js';
 import { toast } from './util.js';
+import * as scenes from './scenes.js';
 
 /* ---------------- helpers ---------------- */
 
@@ -270,7 +271,23 @@ export function installGlobalAPI(hooks){
      * somewhere the UI's download path cannot reach.
      */
     capturePass: (pass, resolution, opts) =>
-      hooks.capturePass?.(pass, resolution, opts)
+      hooks.capturePass?.(pass, resolution, opts),
+
+    /* ---- saved scenes ---- */
+
+    listScenes: scenes.listScenes,
+
+    saveScene(name){
+      return scenes.saveScene(name, serializeScene(hooks.cameraState?.() ?? {}));
+    },
+
+    async loadScene(name){
+      const scene = scenes.loadScene(name);
+      await applyScene(scene, { hooks });
+      return { loaded: name, objects: scene.objects?.length ?? 0 };
+    },
+
+    deleteScene: scenes.deleteScene
   };
 
   window.BlockoutStudio = api;

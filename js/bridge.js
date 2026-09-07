@@ -59,6 +59,12 @@ const HANDLERS = {
     };
   },
 
+  listScenes: () => ({ scenes: window.BlockoutStudio.listScenes() }),
+
+  saveScene: params => window.BlockoutStudio.saveScene(params.name),
+
+  loadScene: params => window.BlockoutStudio.loadScene(params.name),
+
   /**
    * Render a pass and hand the PNG to the server, which writes it to disk
    * and returns the path. Sending bytes rather than a data URL keeps a

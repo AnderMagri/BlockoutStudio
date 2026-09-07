@@ -10,6 +10,7 @@ import {
 } from './objects.js';
 import { initUI, applyShot, refreshObjectCards } from './ui.js';
 import { buildThumbnails } from './thumbnails.js';
+import { makeAutosaver } from './scenes.js';
 import { connectBridge } from './bridge.js';
 import { SHOTS } from './optics.js';
 import { $ } from './util.js';
@@ -19,7 +20,7 @@ function boot(){
 
   // Something you can shoot straight away rather than an empty stage.
   applyRig('three-point');
-  addFromCatalog('bottle');
+  addFromCatalog('sphere');
 
   // There is always a camera. The Scene view is only for arranging things.
   const camera = addCameraObject({ formatId:'ff', equiv:85, fstop:2.8, focus:0.6 });
@@ -39,6 +40,11 @@ function boot(){
 
   // Talk to the MCP server if one is running. Harmless when there isn't.
   connectBridge();
+
+  // A recovery copy, kept quietly. Boot always shows the default scene —
+  // this is offered in the Scenes panel, never applied behind your back.
+  const save = makeAutosaver(() => window.BlockoutStudio.serializeScene());
+  store.on('change', save);
 
   resize();
   tick();

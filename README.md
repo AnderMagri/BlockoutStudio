@@ -97,6 +97,28 @@ exactly what you get.
 
 ---
 
+## Saving scenes
+
+**Scenes…** in the top bar. Name the current scene and save it; reopen,
+download or delete it from the list. A scene is the same JSON the scene
+API speaks, so a saved scene, a pasted one and one an assistant built are
+all the same thing.
+
+Saves live in the browser's local storage, which means saving works with
+no server running. It also means they are tied to that browser — so for
+anything you want to keep properly, or hand to someone else, use
+**Download** and you get a real file. **Import file…** reads one back.
+
+A recovery copy of your work is kept quietly in the background and offered
+as *Restore last session* in the same panel. It is never applied
+automatically: the studio opens on the same default scene every time,
+because a demo that opens differently depending on what you did yesterday
+is a bad demo.
+
+Over MCP: `list_scenes`, `save_scene`, `load_scene`.
+
+---
+
 ## Driving it from a conversation
 
 Open **Export… → Scene JSON**, copy what's there, and paste it to an

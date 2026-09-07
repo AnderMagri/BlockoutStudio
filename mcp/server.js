@@ -38,16 +38,35 @@ const log = (...a) => console.error('[blockout]', ...a);
    Page channel
    ============================================================ */
 
-/** Open SSE connections — normally exactly one: the studio tab. */
-const pages = new Set();
+/**
+ * Open SSE connections, oldest first — normally exactly one: the studio tab.
+ * Ordered rather than a Set because commands go to the newest connection
+ * only. Broadcasting to every tab and taking whichever answered first meant
+ * a stale tab running older page code could win the race and return
+ * "unknown command" for a command the current tab handles perfectly well.
+ */
+const pages = [];
 
 /** In-flight commands awaiting a reply from the page. */
 const pending = new Map();
 
-function broadcast(payload){
-  const line = `data: ${JSON.stringify(payload)}\n\n`;
-  for (const res of pages){
-    try { res.write(line); } catch { pages.delete(res); }
+/** The tab a command should go to: the most recently connected one. */
+const activePage = () => pages[pages.length - 1] || null;
+
+function dropPage(res){
+  const i = pages.indexOf(res);
+  if (i >= 0) pages.splice(i, 1);
+}
+
+function sendToPage(payload){
+  const res = activePage();
+  if (!res) return false;
+  try {
+    res.write(`data: ${JSON.stringify(payload)}\n\n`);
+    return true;
+  } catch {
+    dropPage(res);
+    return false;
   }
 }
 
@@ -56,7 +75,7 @@ function broadcast(payload){
  * @returns {Promise<any>}
  */
 function callPage(method, params = {}, timeoutMs = 20000){
-  if (pages.size === 0){
+  if (!activePage()){
     return Promise.reject(new Error(
       'No studio page is connected. Open http://localhost:' + PORT +
       ' in a browser and leave the tab open.'
@@ -71,7 +90,11 @@ function callPage(method, params = {}, timeoutMs = 20000){
     }, timeoutMs);
 
     pending.set(id, { resolve, reject, timer });
-    broadcast({ id, method, params });
+    if (!sendToPage({ id, method, params })){
+      clearTimeout(timer);
+      pending.delete(id);
+      reject(new Error('Lost the studio page while sending the command.'));
+    }
   });
 }
 
@@ -131,15 +154,16 @@ const server = http.createServer(async (req, res) => {
     res.write('retry: 1000\n\n');
     res.write(': connected\n\n');
 
-    pages.add(res);
-    log(`studio connected (${pages.size} open)`);
+    pages.push(res);
+    log(`studio connected (${pages.length} open${pages.length > 1
+      ? ' — commands go to the newest tab' : ''})`);
 
     // Comment lines keep the connection warm through any idle proxy.
     const beat = setInterval(() => { try { res.write(': ping\n\n'); } catch {} }, 20000);
     req.on('close', () => {
       clearInterval(beat);
-      pages.delete(res);
-      log(`studio disconnected (${pages.size} open)`);
+      dropPage(res);
+      log(`studio disconnected (${pages.length} open)`);
     });
     return;
   }
@@ -177,7 +201,7 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === '/studio/health'){
     res.writeHead(200, { ...cors, 'Content-Type':'application/json' });
     return res.end(JSON.stringify({
-      status:'ok', pagesConnected: pages.size, port: PORT, exportDir: EXPORT_DIR
+      status:'ok', pagesConnected: pages.length, port: PORT, exportDir: EXPORT_DIR
     }));
   }
 
@@ -339,6 +363,33 @@ const TOOLS = [
     }
   },
   {
+    name: 'list_scenes',
+    description: 'List the scenes saved in the studio, newest first.',
+    inputSchema: { type:'object', properties:{}, additionalProperties:false }
+  },
+  {
+    name: 'save_scene',
+    description:
+      'Save the current scene under a name so it can be reopened later. ' +
+      'Saving over an existing name replaces it.',
+    inputSchema: {
+      type:'object',
+      properties:{ name:{ type:'string', description:'What to call this scene' } },
+      required:['name'],
+      additionalProperties:false
+    }
+  },
+  {
+    name: 'load_scene',
+    description: 'Reopen a saved scene by name, replacing what is on the stage.',
+    inputSchema: {
+      type:'object',
+      properties:{ name:{ type:'string' } },
+      required:['name'],
+      additionalProperties:false
+    }
+  },
+  {
     name: 'describe_setup',
     description:
       'Return the studio\'s own prose description of the current scene — camera, ' +
@@ -352,11 +403,11 @@ async function runTool(name, args = {}){
   switch (name){
     case 'studio_status':
       return {
-        connected: pages.size > 0,
-        pagesConnected: pages.size,
+        connected: pages.length > 0,
+        pagesConnected: pages.length,
         url: `http://localhost:${PORT}`,
         exportDir: EXPORT_DIR,
-        hint: pages.size ? 'Studio is connected.'
+        hint: pages.length ? 'Studio is connected.'
             : `Open http://localhost:${PORT} in a browser and leave the tab open.`
       };
 
@@ -365,6 +416,9 @@ async function runTool(name, args = {}){
     case 'describe_setup': return callPage('describeSetup');
     case 'set_camera':     return callPage('setCamera', args);
     case 'set_lighting':   return callPage('setLighting', args);
+    case 'list_scenes':    return callPage('listScenes');
+    case 'save_scene':     return callPage('saveScene', args);
+    case 'load_scene':     return callPage('loadScene', args, 40000);
 
     case 'build_scene':
       // Text objects wait on a font load, so allow a little longer.
