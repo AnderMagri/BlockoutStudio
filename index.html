@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Blockout Studio</title>
+<meta name="description" content="Block out a scene, light it, and export depth maps, masks and prompts as reference for AI image generation.">
+
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/panels.css">
+<link rel="stylesheet" href="css/components.css">
+
 <script type="importmap">
 {
   "imports": {
@@ -12,711 +18,113 @@
   }
 }
 </script>
-<style>
-  :root{
-    --stage:#16181c;
-    --panel:#1e2126;
-    --panel-2:#262a30;
-    --line:#33383f;
-    --ink:#e6e8ea;
-    --ink-dim:#8c949e;
-    --tungsten:#e8a33d;
-    --radius:5px;
-  }
-  *{box-sizing:border-box;margin:0;padding:0}
-  html,body{height:100%}
-  body{
-    background:var(--stage);color:var(--ink);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-    font-size:13px;line-height:1.45;overflow:hidden;
-  }
-  #app{display:flex;height:100vh;width:100%}
-
-  .panel{
-    width:250px;flex:none;background:var(--panel);
-    border-right:1px solid var(--line);overflow-y:auto;padding:14px;
-  }
-  .panel.right{border-right:none;border-left:1px solid var(--line);width:264px}
-
-  #viewport{flex:1;position:relative;min-width:0;background:var(--stage)}
-  #viewport canvas{display:block}
-
-  h1{font-size:13px;font-weight:600;letter-spacing:-0.01em;margin-bottom:2px}
-  .tagline{color:var(--ink-dim);font-size:11px;margin-bottom:16px}
-  .group{margin-bottom:18px}
-  .group > h2{font-size:11px;font-weight:600;color:var(--ink-dim);margin-bottom:8px}
-
-  button{
-    font:inherit;color:var(--ink);background:var(--panel-2);
-    border:1px solid var(--line);border-radius:var(--radius);
-    padding:6px 9px;cursor:pointer;text-align:left;width:100%;
-    transition:background .12s,border-color .12s;
-  }
-  button:hover{background:#2f343b;border-color:#454b53}
-  button:focus-visible{outline:2px solid var(--tungsten);outline-offset:1px}
-  button.primary{background:var(--tungsten);color:#1a1204;border-color:var(--tungsten);font-weight:600;text-align:center}
-  button.primary:hover{background:#f0b055}
-  button.ghost{text-align:center}
-
-  .row{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-  .row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
-  .stack > * + *{margin-top:6px}
-
-  .layer{border:1px solid var(--line);border-radius:var(--radius);margin-bottom:7px;overflow:hidden}
-  .layer.active{border-color:var(--tungsten)}
-  .layer-head{display:flex;align-items:center;gap:5px;padding:6px 7px;background:var(--panel-2)}
-  .layer-head .eye,.layer-head .solo,.layer-head .kill{
-    width:auto;padding:1px 4px;background:none;border:none;color:var(--ink-dim);
-    font-size:11px;line-height:1.3;flex:none;
-  }
-  .layer-head .eye:hover,.layer-head .solo:hover{color:var(--tungsten);background:none}
-  .layer-head .kill:hover{color:#e06a5c;background:none}
-  .layer-head .solo.on{color:var(--tungsten)}
-  .layer-name{
-    flex:1;background:none;border:none;color:var(--ink);font:inherit;
-    padding:1px 2px;border-radius:3px;min-width:0;
-  }
-  .layer-name:hover{background:#31363d}
-  .layer-name:focus{outline:1px solid var(--tungsten);background:var(--stage)}
-  .layer.hidden .layer-name{color:var(--ink-dim);text-decoration:line-through}
-  .count{color:var(--ink-dim);font-size:11px;font-variant-numeric:tabular-nums;flex:none}
-
-  ul{list-style:none}
-  li{
-    display:flex;align-items:center;gap:6px;padding:4px 8px 4px 12px;
-    cursor:pointer;border-left:2px solid transparent;
-  }
-  li:hover{background:var(--panel-2)}
-  li.sel{background:var(--panel-2);border-left-color:var(--tungsten)}
-  li .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
-  li .rm{color:var(--ink-dim);border:none;background:none;width:auto;padding:0 3px;font-size:14px;line-height:1}
-  li .rm:hover{color:#e06a5c;background:none}
-  .empty{color:var(--ink-dim);font-size:11px;padding:5px 12px}
-
-  select{
-    width:100%;font:inherit;color:var(--ink);background:var(--panel-2);
-    border:1px solid var(--line);border-radius:var(--radius);padding:5px 7px;
-  }
-  select:focus-visible{outline:2px solid var(--tungsten)}
-
-  .field{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px}
-  .field label{color:var(--ink-dim);font-size:11px;flex:1}
-  .field .val{
-    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
-    font-size:12px;font-variant-numeric:tabular-nums;
-    min-width:52px;text-align:right;
-  }
-  input[type=range]{width:100%;accent-color:var(--tungsten);background:transparent;margin:2px 0 9px}
-  input[type=range]:focus-visible{outline:2px solid var(--tungsten);outline-offset:2px}
-
-  .note{color:var(--ink-dim);font-size:11px;line-height:1.5;border-top:1px solid var(--line);padding-top:10px;margin-top:4px}
-  #hint{
-    position:absolute;left:14px;bottom:12px;color:var(--ink-dim);font-size:11px;
-    background:rgba(22,24,28,.82);padding:5px 9px;border-radius:var(--radius);pointer-events:none;
-  }
-  #promptOut{
-    width:100%;height:104px;resize:vertical;margin-top:6px;
-    background:var(--stage);color:var(--ink);border:1px solid var(--line);
-    border-radius:var(--radius);padding:7px;
-    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;line-height:1.5;
-  }
-  #promptOut:focus{outline:2px solid var(--tungsten);outline-offset:-1px}
-
-  @media (max-width:900px){
-    #app{flex-direction:column}
-    .panel,.panel.right{width:100%;border:none;border-bottom:1px solid var(--line);max-height:32vh}
-    #viewport{min-height:38vh}
-  }
-  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
-</style>
 </head>
 <body>
-<div id="app">
 
-  <aside class="panel">
-    <h1>Blockout Studio</h1>
-    <p class="tagline">Base scene for AI generation</p>
-
-    <div class="group">
-      <h2>Add primitive</h2>
-      <div class="row">
-        <button data-add="cylinder">Cylinder</button>
-        <button data-add="box">Box</button>
-        <button data-add="sphere">Sphere</button>
-        <button data-add="cone">Cone</button>
-      </div>
-      <p class="note" style="border:none;padding:6px 0 0;margin:0">
-        New primitives go into the active layer.
-      </p>
-    </div>
-
-    <div class="group">
-      <h2>Layers</h2>
-      <div id="layers"></div>
-      <button class="ghost" id="addLayer" style="margin-top:6px">New layer</button>
-    </div>
-
-    <div class="group" id="objPanel" hidden>
-      <h2>Selected</h2>
-      <div class="stack">
-        <select id="moveTo" title="Move to layer"></select>
-        <div class="row-3">
-          <button data-gizmo="translate">Move</button>
-          <button data-gizmo="rotate">Rotate</button>
-          <button data-gizmo="scale">Scale</button>
-        </div>
-        <button class="ghost" id="dup">Duplicate</button>
-      </div>
-    </div>
-  </aside>
+<div id="stage">
 
   <main id="viewport">
-    <div id="hint">Drag to orbit · scroll to zoom · click to select</div>
+    <div id="viewOverlay"><div id="frameGuide"></div></div>
   </main>
 
-  <aside class="panel right">
-    <div class="group">
-      <h2>Camera</h2>
-      <div class="field"><label for="focal">Focal length</label><span class="val" id="focalV">85 mm</span></div>
-      <input type="range" id="focal" min="18" max="200" step="1" value="85">
-      <div class="field"><label for="fstop">Aperture</label><span class="val" id="fstopV">f/2.8</span></div>
-      <input type="range" id="fstop" min="0" max="8" step="1" value="3">
-      <div class="field"><label for="height">Height</label><span class="val" id="heightV">0.16 m</span></div>
-      <input type="range" id="height" min="0.01" max="1.2" step="0.01" value="0.16">
+  <!-- ============ top left: identity + view ============ -->
+  <div class="hud hud-tl">
+    <div class="pill">
+      <span class="dot"></span>
+      <span class="brand">
+        <span>Blockout Studio</span>
+      </span>
+    </div>
+    <div class="pill tight">
+      <div class="seg" id="viewSeg"></div>
+    </div>
+    <div class="pill">
+      <span class="readout" id="viewReadout"></span>
+    </div>
+  </div>
 
-      <h2 style="margin-top:12px">Framing</h2>
-      <div class="row">
-        <button data-shot="hero">Hero 3/4</button>
-        <button data-shot="front">Front</button>
-        <button data-shot="low">Low angle</button>
-        <button data-shot="top">Top-down</button>
-      </div>
+  <!-- ============ top right: frame ============ -->
+  <div class="hud hud-tr">
+    <div class="pill">
+      <label class="sr-only" for="aspect">Aspect ratio</label>
+      <select id="aspect" title="Export aspect ratio"></select>
+      <label class="sr-only" for="resolution">Export resolution</label>
+      <select id="resolution" title="Export resolution"></select>
+    </div>
+  </div>
+
+  <!-- ============ left: build ============ -->
+  <aside class="hud hud-left">
+    <div class="panel">
+      <button class="btn-accent" id="addBtn" aria-haspopup="menu" aria-expanded="false">Add object</button>
     </div>
 
-    <div class="group">
-      <h2>Lighting</h2>
-      <div class="field"><label for="keyAz">Key · azimuth</label><span class="val" id="keyAzV">45°</span></div>
-      <input type="range" id="keyAz" min="-180" max="180" step="5" value="45">
-      <div class="field"><label for="keyEl">Key · elevation</label><span class="val" id="keyElV">45°</span></div>
-      <input type="range" id="keyEl" min="5" max="88" step="1" value="45">
-      <div class="field"><label for="keyInt">Key · intensity</label><span class="val" id="keyIntV">3.0</span></div>
-      <input type="range" id="keyInt" min="0" max="8" step="0.1" value="3">
-      <div class="field"><label for="fillInt">Fill</label><span class="val" id="fillIntV">0.6</span></div>
-      <input type="range" id="fillInt" min="0" max="4" step="0.1" value="0.6">
-      <div class="field"><label for="rimInt">Rim</label><span class="val" id="rimIntV">2.2</span></div>
-      <input type="range" id="rimInt" min="0" max="8" step="0.1" value="2.2">
+    <div class="panel panel-grow">
+      <h2>Layers</h2>
+      <div class="scroll"><div id="layers"></div></div>
+      <button class="btn-quiet" id="addLayer" style="margin-top:8px">New layer</button>
     </div>
+  </aside>
 
-    <div class="group">
+  <!-- ============ right: look ============ -->
+  <aside class="hud hud-right">
+
+    <section class="panel" id="inspectorPanel">
+      <h2>Selected</h2>
+      <div id="inspector"><p class="empty-note">Nothing selected.</p></div>
+    </section>
+
+    <section class="panel">
+      <h2>Lighting rig</h2>
+      <div class="gallery" id="lightGallery"></div>
+      <p class="caption">Replaces the lights in the Lighting layer. Select any light afterwards to adjust it.</p>
+    </section>
+
+    <section class="panel">
       <h2>Export</h2>
       <div class="stack">
-        <button class="primary" id="expRender">Download render</button>
-        <button class="ghost" id="expDepth">Download depth map</button>
-        <button class="ghost" id="expMask">Download active layer mask</button>
-        <button class="ghost" id="genPrompt">Generate prompt</button>
+        <button class="btn-accent" data-export="render">Render</button>
+        <div class="grid-2">
+          <button data-export="depth">Depth</button>
+          <button data-export="normal">Normal</button>
+        </div>
+        <button data-export="mask">Active layer mask</button>
       </div>
-      <textarea id="promptOut" readonly placeholder="Your prompt appears here, with camera settings already filled in."></textarea>
-    </div>
 
-    <p class="note">
-      Aperture doesn't blur the preview. It goes into the prompt, and the
-      model resolves depth of field at generation time.
-    </p>
+      <details class="opts">
+        <summary>Depth options</summary>
+        <label class="switch">Fit range to subject
+          <input type="checkbox" id="depthSubjectOnly" checked></label>
+        <label class="switch">Invert (near = black)
+          <input type="checkbox" id="depthInvert"></label>
+        <p class="caption">Default is near&nbsp;=&nbsp;white, the convention Krea and ControlNet depth expect.</p>
+      </details>
+
+      <div class="stack" style="margin-top:9px">
+        <button id="genPrompt">Describe this setup…</button>
+        <button class="btn-quiet" id="sceneJson">Scene JSON…</button>
+      </div>
+    </section>
+
   </aside>
+
+  <div class="hud hud-bl">
+    <p id="hint">Drag to orbit · click to select · W/E/R gizmo · F frame · X delete</p>
+  </div>
+
+  <div id="loadError" hidden></div>
 </div>
 
-<script type="module">
-import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { TransformControls } from 'three/addons/controls/TransformControls.js';
-
-const $ = id => document.getElementById(id);
-const FSTOPS = [1.4,1.8,2.0,2.8,4.0,5.6,8.0,11,16];
-const viewport = $('viewport');
-
-/* ---------- base ---------- */
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x16181c);
-
-const renderer = new THREE.WebGLRenderer({antialias:true, preserveDrawingBuffer:true});
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-viewport.appendChild(renderer.domElement);
-
-const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 50);
-camera.filmGauge = 36;
-camera.setFocalLength(85);
-camera.position.set(0.42,0.16,-0.42);
-
-const orbit = new OrbitControls(camera, renderer.domElement);
-orbit.target.set(0,0.07,0);
-orbit.enableDamping = true;
-orbit.dampingFactor = 0.08;
-
-const gizmo = new TransformControls(camera, renderer.domElement);
-gizmo.setSize(0.8);
-gizmo.addEventListener('dragging-changed', e => orbit.enabled = !e.value);
-scene.add(gizmo);
-
-/* ---------- materials ---------- */
-const matBlock  = new THREE.MeshStandardMaterial({color:0x8a8a8a, roughness:0.62});
-const matGround = new THREE.MeshStandardMaterial({color:0x5c5c5c, roughness:0.85});
-const matBack   = new THREE.MeshStandardMaterial({color:0x4a4a4a, roughness:0.9});
-
-/* ---------- set ---------- */
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(4,4), matGround);
-ground.rotation.x = -Math.PI/2;
-ground.receiveShadow = true;
-ground.userData.name = 'Ground';
-scene.add(ground);
-
-const backdrop = new THREE.Mesh(new THREE.PlaneGeometry(4,3), matBack);
-backdrop.position.set(0,1.5,1.1);
-backdrop.rotation.y = Math.PI;
-backdrop.receiveShadow = true;
-backdrop.userData.name = 'Backdrop';
-scene.add(backdrop);
-
-const grid = new THREE.GridHelper(2, 40, 0x3a3f46, 0x2a2e34);
-grid.position.y = 0.0005;
-scene.add(grid);
-
-/* ---------- lighting ---------- */
-const keyLight = new THREE.DirectionalLight(0xffffff, 3);
-keyLight.castShadow = true;
-keyLight.shadow.mapSize.set(2048,2048);
-keyLight.shadow.camera.near = 0.05;
-keyLight.shadow.camera.far  = 6;
-keyLight.shadow.camera.left = keyLight.shadow.camera.bottom = -0.7;
-keyLight.shadow.camera.right = keyLight.shadow.camera.top   =  0.7;
-keyLight.shadow.bias = -0.0012;
-scene.add(keyLight, keyLight.target);
-
-const fillLight = new THREE.DirectionalLight(0xffffff, 0.6);
-fillLight.position.set(-0.9,0.5,-0.5);
-scene.add(fillLight);
-
-const rimLight = new THREE.DirectionalLight(0xffffff, 2.2);
-rimLight.position.set(-0.35,0.8,1.0);
-scene.add(rimLight);
-
-scene.add(new THREE.AmbientLight(0xffffff, 0.18));
-
-function placeKey(){
-  const az = THREE.MathUtils.degToRad(+$('keyAz').value);
-  const el = THREE.MathUtils.degToRad(+$('keyEl').value);
-  const r = 1.4;
-  keyLight.position.set(
-    r*Math.cos(el)*Math.sin(az), r*Math.sin(el), r*Math.cos(el)*Math.cos(az)
-  );
-  keyLight.target.position.set(0,0.06,0);
-  keyLight.target.updateMatrixWorld();
-}
-
-/* ---------- LAYERS ---------- */
-let layerSeq = 0;
-const layers = [];
-let activeLayer = null;
-let soloLayer = null;
-
-function makeLayer(name){
-  const L = {id:++layerSeq, name, visible:true};
-  layers.push(L);
-  return L;
-}
-
-const layProduct = makeLayer('Product');
-const layScene    = makeLayer('Scene');
-const layBackground   = makeLayer('Background');
-activeLayer = layProduct;
-
-ground.userData.layerId   = layBackground.id;
-backdrop.userData.layerId = layBackground.id;
-
-const items = [ground, backdrop];
-const editable = [];
-let selected = null;
-let counter = 0;
-
-function layerOf(mesh){ return layers.find(l => l.id === mesh.userData.layerId); }
-
-function applyVisibility(){
-  items.forEach(m => {
-    const L = layerOf(m);
-    if (!L){ m.visible = true; return; }
-    m.visible = soloLayer ? (L === soloLayer) : L.visible;
-  });
-  if (selected && !selected.visible) select(null);
-}
-
-/* ---------- objects ---------- */
-const GEO = {
-  cylinder: () => new THREE.CylinderGeometry(0.0425,0.0425,0.13,64),
-  box:      () => new THREE.BoxGeometry(0.08,0.10,0.05),
-  sphere:   () => new THREE.SphereGeometry(0.045,48,32),
-  cone:     () => new THREE.ConeGeometry(0.045,0.11,48)
-};
-const LABEL = {cylinder:'Cylinder', box:'Box', sphere:'Sphere', cone:'Cone'};
-
-function addItem(kind, pos, layer){
-  const geo = GEO[kind]();
-  geo.computeBoundingBox();
-  const mesh = new THREE.Mesh(geo, matBlock.clone());
-  mesh.castShadow = mesh.receiveShadow = true;
-  const h = geo.boundingBox.max.y - geo.boundingBox.min.y;
-  mesh.position.copy(pos || new THREE.Vector3(0, h/2, 0));
-  mesh.userData.name = `${LABEL[kind]} ${++counter}`;
-  mesh.userData.kind = kind;
-  mesh.userData.layerId = (layer || activeLayer).id;
-  scene.add(mesh);
-  items.push(mesh);
-  editable.push(mesh);
-  applyVisibility();
-  select(mesh);
-  return mesh;
-}
-
-function removeItem(mesh){
-  if (selected === mesh) select(null);
-  scene.remove(mesh);
-  mesh.geometry.dispose();
-  mesh.material.dispose();
-  items.splice(items.indexOf(mesh),1);
-  editable.splice(editable.indexOf(mesh),1);
-  renderLayers();
-}
-
-function select(mesh){
-  selected = mesh;
-  if (mesh) gizmo.attach(mesh); else gizmo.detach();
-  $('objPanel').hidden = !mesh;
-  if (mesh){
-    const L = layerOf(mesh);
-    if (L) activeLayer = L;
-    fillMoveTo(mesh);
+<script type="module" src="js/main.js"></script>
+<script>
+  // Module scripts fail silently on file:// — say so rather than showing a blank page.
+  if (location.protocol === 'file:'){
+    var box = document.getElementById('loadError');
+    box.hidden = false;
+    box.innerHTML = '<strong>Serve this over HTTP.</strong><br>' +
+      'ES modules are blocked on file:// URLs. Run <code>python3 -m http.server</code> ' +
+      'in this folder, then open <code>http://localhost:8000</code>.';
   }
-  renderLayers();
-}
-
-function fillMoveTo(mesh){
-  const sel = $('moveTo');
-  sel.innerHTML = '';
-  layers.forEach(L => {
-    const o = document.createElement('option');
-    o.value = L.id; o.textContent = `Layer: ${L.name}`;
-    if (L.id === mesh.userData.layerId) o.selected = true;
-    sel.appendChild(o);
-  });
-}
-
-$('moveTo').onchange = e => {
-  if (!selected) return;
-  selected.userData.layerId = +e.target.value;
-  activeLayer = layerOf(selected);
-  applyVisibility();
-  renderLayers();
-};
-
-/* ---------- layer panel ---------- */
-function renderLayers(){
-  const host = $('layers');
-  host.innerHTML = '';
-
-  layers.forEach(L => {
-    const wrap = document.createElement('div');
-    wrap.className = 'layer' + (L === activeLayer ? ' active' : '') + (L.visible ? '' : ' hidden');
-
-    const head = document.createElement('div');
-    head.className = 'layer-head';
-    head.onclick = () => { activeLayer = L; renderLayers(); };
-
-    const eye = document.createElement('button');
-    eye.className = 'eye';
-    eye.textContent = L.visible ? '◉' : '○';
-    eye.title = L.visible ? 'Hide layer' : 'Show layer';
-    eye.onclick = e => { e.stopPropagation(); L.visible = !L.visible; applyVisibility(); renderLayers(); };
-
-    const solo = document.createElement('button');
-    solo.className = 'solo' + (soloLayer === L ? ' on' : '');
-    solo.textContent = 'S';
-    solo.title = 'Isolate this layer';
-    solo.onclick = e => {
-      e.stopPropagation();
-      soloLayer = (soloLayer === L) ? null : L;
-      applyVisibility(); renderLayers();
-    };
-
-    const nameEl = document.createElement('input');
-    nameEl.className = 'layer-name';
-    nameEl.value = L.name;
-    nameEl.onclick = e => e.stopPropagation();
-    nameEl.oninput = e => { L.name = e.target.value || 'Layer'; if (selected) fillMoveTo(selected); };
-
-    const members = items.filter(m => m.userData.layerId === L.id);
-    const count = document.createElement('span');
-    count.className = 'count';
-    count.textContent = members.length;
-
-    head.append(eye, solo, nameEl, count);
-
-    if (layers.length > 1){
-      const kill = document.createElement('button');
-      kill.className = 'kill';
-      kill.textContent = '×';
-      kill.title = 'Delete layer (its objects move to the first one)';
-      kill.onclick = e => {
-        e.stopPropagation();
-        const target = layers.find(x => x !== L);
-        members.forEach(m => m.userData.layerId = target.id);
-        layers.splice(layers.indexOf(L),1);
-        if (activeLayer === L) activeLayer = target;
-        if (soloLayer === L) soloLayer = null;
-        applyVisibility(); renderLayers();
-      };
-      head.appendChild(kill);
-    }
-
-    wrap.appendChild(head);
-
-    const ul = document.createElement('ul');
-    if (!members.length){
-      ul.innerHTML = '<li class="empty">Empty</li>';
-    } else {
-      members.forEach(m => {
-        const li = document.createElement('li');
-        if (m === selected) li.className = 'sel';
-        const nm = document.createElement('span');
-        nm.className = 'nm';
-        nm.textContent = m.userData.name;
-        li.appendChild(nm);
-        if (editable.includes(m)){
-          const rm = document.createElement('button');
-          rm.className = 'rm'; rm.textContent = '×'; rm.title = 'Remove';
-          rm.onclick = e => { e.stopPropagation(); removeItem(m); };
-          li.appendChild(rm);
-          li.onclick = () => select(m);
-        } else {
-          nm.style.color = 'var(--ink-dim)';
-        }
-        ul.appendChild(li);
-      });
-    }
-    wrap.appendChild(ul);
-    host.appendChild(wrap);
-  });
-}
-
-$('addLayer').onclick = () => {
-  activeLayer = makeLayer(`Layer ${layers.length + 1}`);
-  renderLayers();
-};
-
-/* ---------- click selection ---------- */
-const ray = new THREE.Raycaster();
-const ptr = new THREE.Vector2();
-let downAt = null;
-
-renderer.domElement.addEventListener('pointerdown', e => downAt = {x:e.clientX,y:e.clientY});
-renderer.domElement.addEventListener('pointerup', e => {
-  if (!downAt) return;
-  const moved = Math.hypot(e.clientX-downAt.x, e.clientY-downAt.y);
-  downAt = null;
-  if (moved > 4 || gizmo.dragging) return;
-  const r = renderer.domElement.getBoundingClientRect();
-  ptr.x = ((e.clientX-r.left)/r.width)*2 - 1;
-  ptr.y = -((e.clientY-r.top)/r.height)*2 + 1;
-  ray.setFromCamera(ptr, camera);
-  const hit = ray.intersectObjects(editable.filter(m => m.visible), false)[0];
-  select(hit ? hit.object : null);
-});
-
-/* ---------- framing presets ---------- */
-const SHOTS = {
-  hero:  {pos:[0.42,0.16,-0.42], focal:85,  target:[0,0.07,0], label:'three-quarter 45 degrees'},
-  front: {pos:[0,0.075,-0.55],   focal:100, target:[0,0.07,0], label:'straight-on front'},
-  low:   {pos:[0.30,0.045,-0.38],focal:85,  target:[0,0.08,0], label:'low angle'},
-  top:   {pos:[0.02,0.62,-0.10], focal:50,  target:[0,0.02,0], label:'top-down'}
-};
-let shotLabel = SHOTS.hero.label;
-
-function applyShot(key){
-  const s = SHOTS[key];
-  camera.position.set(...s.pos);
-  orbit.target.set(...s.target);
-  $('focal').value = s.focal;
-  $('height').value = s.pos[1].toFixed(2);
-  shotLabel = s.label;
-  syncCamera();
-  orbit.update();
-}
-
-/* ---------- UI ---------- */
-function syncCamera(){
-  const f = +$('focal').value;
-  camera.setFocalLength(f);
-  $('focalV').textContent = `${f} mm`;
-  $('fstopV').textContent = `f/${FSTOPS[+$('fstop').value]}`;
-  const h = +$('height').value;
-  camera.position.y = h;
-  $('heightV').textContent = `${h.toFixed(2)} m`;
-  camera.updateProjectionMatrix();
-}
-
-function syncLights(){
-  keyLight.intensity  = +$('keyInt').value;
-  fillLight.intensity = +$('fillInt').value;
-  rimLight.intensity  = +$('rimInt').value;
-  $('keyAzV').textContent   = `${$('keyAz').value}°`;
-  $('keyElV').textContent   = `${$('keyEl').value}°`;
-  $('keyIntV').textContent  = (+$('keyInt').value).toFixed(1);
-  $('fillIntV').textContent = (+$('fillInt').value).toFixed(1);
-  $('rimIntV').textContent  = (+$('rimInt').value).toFixed(1);
-  placeKey();
-}
-
-['focal','fstop','height'].forEach(id => $(id).addEventListener('input', syncCamera));
-['keyAz','keyEl','keyInt','fillInt','rimInt'].forEach(id => $(id).addEventListener('input', syncLights));
-
-document.querySelectorAll('[data-add]').forEach(b => b.onclick = () => addItem(b.dataset.add));
-document.querySelectorAll('[data-shot]').forEach(b => b.onclick = () => applyShot(b.dataset.shot));
-document.querySelectorAll('[data-gizmo]').forEach(b => b.onclick = () => gizmo.setMode(b.dataset.gizmo));
-
-$('dup').onclick = () => {
-  if (!selected) return;
-  const p = selected.position.clone();
-  p.x += 0.09;
-  addItem(selected.userData.kind || 'box', p, layerOf(selected));
-};
-
-addEventListener('keydown', e => {
-  if (e.target.matches('input,textarea,select')) return;
-  const k = e.key.toLowerCase();
-  if (k === 'w') gizmo.setMode('translate');
-  if (k === 'e') gizmo.setMode('rotate');
-  if (k === 'r') gizmo.setMode('scale');
-  if ((k === 'x' || e.key === 'Backspace') && selected && editable.includes(selected)) removeItem(selected);
-});
-
-/* ---------- export ---------- */
-function download(url, name){
-  const a = document.createElement('a');
-  a.href = url; a.download = name; a.click();
-}
-
-function withCleanScene(fn){
-  const wasGrid = grid.visible, wasGizmo = gizmo.visible;
-  grid.visible = false; gizmo.visible = false;
-  const out = fn();
-  grid.visible = wasGrid; gizmo.visible = wasGizmo;
-  return out;
-}
-
-$('expRender').onclick = () => {
-  const url = withCleanScene(() => {
-    renderer.render(scene, camera);
-    return renderer.domElement.toDataURL('image/png');
-  });
-  download(url, 'blockout-render.png');
-};
-
-$('expDepth').onclick = () => {
-  const box = new THREE.Box3();
-  items.filter(m => m.visible).forEach(m => box.expandByObject(m));
-  const sphere = box.getBoundingSphere(new THREE.Sphere());
-  const dist = camera.position.distanceTo(sphere.center);
-  const near = camera.near, far = camera.far, bg = scene.background;
-
-  camera.near = Math.max(0.01, dist - sphere.radius*1.15);
-  camera.far  = dist + sphere.radius*1.15;
-  camera.updateProjectionMatrix();
-
-  const url = withCleanScene(() => {
-    scene.background = new THREE.Color(0x000000);
-    scene.overrideMaterial = new THREE.MeshDepthMaterial();
-    renderer.render(scene, camera);
-    const c = document.createElement('canvas');
-    c.width = renderer.domElement.width;
-    c.height = renderer.domElement.height;
-    const ctx = c.getContext('2d');
-    ctx.filter = 'invert(1)';
-    ctx.drawImage(renderer.domElement, 0, 0);
-    scene.overrideMaterial = null;
-    scene.background = bg;
-    return c.toDataURL('image/png');
-  });
-
-  camera.near = near; camera.far = far;
-  camera.updateProjectionMatrix();
-  download(url, 'blockout-depth.png');
-};
-
-$('expMask').onclick = () => {
-  if (!activeLayer) return;
-  const bg = scene.background;
-  const originals = new Map();
-  const white = new THREE.MeshBasicMaterial({color:0xffffff});
-  const black = new THREE.MeshBasicMaterial({color:0x000000});
-
-  items.forEach(m => {
-    originals.set(m, {mat:m.material, vis:m.visible});
-    m.visible = true;
-    m.material = (m.userData.layerId === activeLayer.id) ? white : black;
-  });
-
-  const url = withCleanScene(() => {
-    scene.background = new THREE.Color(0x000000);
-    renderer.render(scene, camera);
-    return renderer.domElement.toDataURL('image/png');
-  });
-
-  items.forEach(m => {
-    const o = originals.get(m);
-    m.material = o.mat; m.visible = o.vis;
-  });
-  scene.background = bg;
-  white.dispose(); black.dispose();
-  applyVisibility();
-
-  const slug = activeLayer.name.toLowerCase().replace(/[^a-z0-9]+/g,'-');
-  download(url, `blockout-mask-${slug}.png`);
-};
-
-$('genPrompt').onclick = () => {
-  const f  = Math.round(camera.getFocalLength());
-  const fs = FSTOPS[+$('fstop').value];
-  const az = $('keyAz').value, el = $('keyEl').value;
-  $('promptOut').value =
-`[product and material]
-· on [surface], in [environment]
-· lighting: key light at ${az} degrees azimuth and ${el} degrees elevation, soft fill on the opposite side, rim light separating it from the background
-· camera: ${f}mm, f/${fs}, ${shotLabel}
-· mood: [atmosphere and palette]
-· razor-sharp on the product, depth of field consistent with f/${fs}`;
-  $('promptOut').select();
-};
-
-/* ---------- loop ---------- */
-function resize(){
-  const w = viewport.clientWidth, h = viewport.clientHeight;
-  renderer.setSize(w,h,false);
-  camera.aspect = w/h;
-  camera.updateProjectionMatrix();
-}
-addEventListener('resize', resize);
-
-function tick(){
-  requestAnimationFrame(tick);
-  orbit.update();
-  renderer.render(scene, camera);
-}
-
-resize();
-syncCamera();
-syncLights();
-addItem('cylinder', null, layProduct);
-renderLayers();
-tick();
 </script>
 </body>
 </html>

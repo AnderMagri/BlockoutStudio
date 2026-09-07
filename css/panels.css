@@ -1,0 +1,237 @@
+/* ============================================================
+   panels.css — the floating HUD.
+
+   No sidebars. The viewport is full-bleed and every control floats
+   above it on a vibrancy panel, the way macOS tool palettes do.
+   ============================================================ */
+
+#stage{ position:relative; width:100%; height:100vh; overflow:hidden }
+
+/* ---------------- viewport ---------------- */
+
+#viewport{ position:absolute; inset:0; background:var(--stage) }
+
+/* The canvas MUST be CSS-sized. three.js is called with updateStyle=false so
+   exports can resize the drawing buffer without disturbing layout — without
+   these two lines the canvas lays out at devicePixelRatio times its container
+   and overflows the page. */
+#viewport canvas{ display:block; width:100%; height:100% }
+
+#viewOverlay{ position:absolute; inset:0; pointer-events:none }
+
+#frameGuide{
+  position:absolute; top:50%; left:50%;
+  transform:translate(-50%, -50%);
+  border-radius:3px;
+  box-shadow:0 0 0 1px rgba(255,255,255,.16), 0 0 0 4000px rgba(8,8,10,.62);
+}
+
+/* ---------------- panel material ---------------- */
+
+.panel{
+  background:var(--panel);
+  backdrop-filter:blur(40px) saturate(180%);
+  -webkit-backdrop-filter:blur(40px) saturate(180%);
+  border-radius:var(--r-panel);
+  box-shadow:var(--shadow-panel);
+  padding:13px;
+}
+
+.hud{ position:absolute; z-index:10 }
+
+.hud-tl{ top:14px; left:14px;  display:flex; align-items:center; gap:9px }
+.hud-tr{ top:14px; right:14px; display:flex; align-items:center; gap:9px }
+.hud-bl{ bottom:14px; left:14px }
+
+.hud-left{
+  top:60px; left:14px; bottom:14px;
+  width:216px;
+  display:flex; flex-direction:column; gap:10px;
+  pointer-events:none;                 /* gaps stay click-through to the scene */
+}
+.hud-right{
+  top:60px; right:14px; bottom:14px;
+  width:262px;
+  display:flex; flex-direction:column; gap:10px;
+  overflow-y:auto; overscroll-behavior:contain;
+  pointer-events:none;
+  scrollbar-width:thin;
+  scrollbar-color:rgba(255,255,255,.18) transparent;
+}
+.hud-left > *, .hud-right > *{ pointer-events:auto; flex:none }
+
+.hud-left::-webkit-scrollbar, .hud-right::-webkit-scrollbar{ width:7px }
+.hud-left::-webkit-scrollbar-thumb, .hud-right::-webkit-scrollbar-thumb{
+  background:rgba(255,255,255,.16); border-radius:4px;
+}
+.hud-left::-webkit-scrollbar-track, .hud-right::-webkit-scrollbar-track{ background:transparent }
+
+/* A panel that owns the remaining height and scrolls inside itself. */
+.panel-grow{
+  flex:1 1 auto; min-height:0;
+  display:flex; flex-direction:column;
+  overflow:hidden;
+}
+.panel-grow .scroll{
+  overflow-y:auto; min-height:0; margin:0 -4px; padding:0 4px;
+  scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.18) transparent;
+}
+.panel-grow .scroll::-webkit-scrollbar{ width:6px }
+.panel-grow .scroll::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.16); border-radius:3px }
+
+/* ---------------- pills ---------------- */
+
+.pill{
+  display:flex; align-items:center; gap:8px;
+  height:32px; padding:0 12px;
+  border-radius:var(--r-pill);
+  background:var(--panel);
+  backdrop-filter:blur(40px) saturate(180%);
+  -webkit-backdrop-filter:blur(40px) saturate(180%);
+  box-shadow:var(--shadow-panel);
+  white-space:nowrap;
+}
+.pill.tight{ padding:0 4px }
+.pill .dot{
+  width:7px; height:7px; border-radius:50%;
+  background:var(--accent); flex:none;
+}
+.pill .readout{
+  font-family:var(--mono); font-size:10.5px;
+  color:var(--label-2); font-variant-numeric:tabular-nums;
+}
+.pill select{ background:transparent; height:26px; font-size:12px }
+.pill select:hover{ background:var(--fill) }
+
+/* ---------------- menu popover ---------------- */
+
+.menu{
+  position:absolute; z-index:60;
+  min-width:210px; max-height:min(70vh, 560px);
+  overflow-y:auto;
+  padding:6px;
+  border-radius:12px;
+  background:var(--menu);
+  backdrop-filter:blur(50px) saturate(180%);
+  -webkit-backdrop-filter:blur(50px) saturate(180%);
+  box-shadow:var(--shadow-menu);
+  animation:menuIn .13s cubic-bezier(.2,.9,.3,1);
+}
+@keyframes menuIn{
+  from{ opacity:0; transform:translateY(-5px) scale(.97) }
+  to  { opacity:1; transform:none }
+}
+.menu-group + .menu-group{
+  margin-top:4px; padding-top:5px;
+  border-top:.5px solid var(--hairline);
+}
+.menu-label{
+  font-size:10.5px; font-weight:590; letter-spacing:.03em;
+  text-transform:uppercase; color:var(--label-3);
+  padding:5px 9px 3px;
+}
+.menu button{
+  width:100%; text-align:left;
+  background:transparent; border-radius:7px;
+  padding:5px 9px; font-size:13px;
+  display:flex; align-items:center; gap:9px;
+}
+.menu button:hover{ background:var(--accent); color:#231400 }
+.menu button:active{ transform:none; background:var(--accent-press) }
+.menu button .g{
+  width:15px; text-align:center; font-size:11px;
+  color:var(--label-3); flex:none;
+}
+.menu button:hover .g{ color:#231400 }
+
+/* ---------------- sheet (prompt) ---------------- */
+
+.sheet-backdrop{
+  position:absolute; inset:0; z-index:80;
+  background:rgba(0,0,0,.45);
+  backdrop-filter:blur(3px);
+  display:flex; align-items:center; justify-content:center;
+  animation:fadeIn .15s ease;
+}
+@keyframes fadeIn{ from{opacity:0} to{opacity:1} }
+
+.sheet{
+  width:min(560px, calc(100vw - 56px));
+  max-height:calc(100vh - 80px);
+  display:flex; flex-direction:column;
+  padding:18px;
+  border-radius:16px;
+  background:rgba(38,38,40,.86);
+  backdrop-filter:blur(50px) saturate(180%);
+  -webkit-backdrop-filter:blur(50px) saturate(180%);
+  box-shadow:var(--shadow-menu);
+  animation:sheetIn .2s cubic-bezier(.2,.9,.3,1);
+}
+@keyframes sheetIn{
+  from{ opacity:0; transform:translateY(10px) scale(.98) }
+  to  { opacity:1; transform:none }
+}
+.sheet h1{ font-size:15px; margin-bottom:3px }
+.sheet .sheet-sub{ font-size:12px; color:var(--label-2); margin-bottom:13px }
+.sheet textarea{
+  flex:1; min-height:230px;
+  background:rgba(0,0,0,.28);
+  border-radius:10px; padding:11px;
+  font-size:11.5px; line-height:1.6;
+}
+.sheet-actions{ display:flex; gap:8px; margin-top:13px }
+.sheet-actions button{ width:auto; flex:1; padding:7px 14px }
+
+/* ---------------- hint + toast ---------------- */
+
+#hint{
+  font-size:11px; color:var(--label-3);
+  background:var(--panel);
+  backdrop-filter:blur(30px);
+  -webkit-backdrop-filter:blur(30px);
+  padding:6px 11px; border-radius:var(--r-pill);
+  pointer-events:none;
+  box-shadow:0 0 0 .5px var(--hairline-soft);
+}
+
+#toast{
+  position:absolute; left:50%; bottom:22px;
+  transform:translateX(-50%) translateY(8px);
+  z-index:90;
+  padding:9px 16px; border-radius:var(--r-pill);
+  background:rgba(44,44,46,.88);
+  backdrop-filter:blur(40px) saturate(180%);
+  -webkit-backdrop-filter:blur(40px) saturate(180%);
+  box-shadow:var(--shadow-menu);
+  font-size:12.5px;
+  opacity:0; pointer-events:none;
+  transition:opacity .2s ease, transform .2s cubic-bezier(.2,.9,.3,1);
+}
+#toast.show{ opacity:1; transform:translateX(-50%) translateY(0) }
+#toast.err{ box-shadow:var(--shadow-menu), inset 3px 0 0 var(--red) }
+
+#loadError{
+  position:absolute; top:50%; left:50%;
+  transform:translate(-50%,-50%); z-index:100;
+  max-width:430px; padding:18px 20px;
+  border-radius:14px;
+  background:rgba(44,44,46,.92);
+  backdrop-filter:blur(40px);
+  box-shadow:var(--shadow-menu), inset 3px 0 0 var(--red);
+  font-size:12.5px; line-height:1.65;
+}
+#loadError code{
+  font-family:var(--mono); font-size:11px;
+  background:rgba(0,0,0,.35); padding:2px 6px; border-radius:5px;
+}
+
+/* ---------------- narrow screens ---------------- */
+
+@media (max-width:1080px){
+  .hud-left, .hud-right{ width:200px }
+  .hud-right{ width:236px }
+}
+@media (max-width:860px){
+  .hud-left{ display:none }
+  .hud-right{ top:56px; width:216px }
+}
