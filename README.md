@@ -31,9 +31,10 @@ It also works as-is on GitHub Pages (Settings → Pages → deploy from
 **Objects** — primitives, packaging silhouettes (bottle, can, jar, tube,
 cup, carton), everyday objects (book, magazine, card, phone, rock,
 boulder, cloud), a head, a poseable mannequin, extruded text and editable
-splines. They live in a tabbed card box, and each card's picture is
-rendered from the real geometry at startup — so a new catalog entry gets
-its artwork for free and the picture can never drift from the shape.
+splines. **Add object** opens a picker of tabbed cards, and each card's
+picture is rendered from the real geometry at startup — so a new catalog
+entry gets its artwork for free and the picture can never drift from the
+shape it represents.
 
 **Cameras are objects.** Drop one in, move it with the gizmo, select it to
 set the lens. Focal lengths are full-frame equivalents and the real focal
@@ -211,7 +212,7 @@ One entry in `js/catalog.js`:
 ```
 
 `make` may return a geometry, a mesh or a whole `Object3D`. `rest:'float'`
-leaves it in the air instead of sitting it on the floor. The card box, its
+leaves it in the air instead of sitting it on the floor. The picker, its
 thumbnail, the layer icons and the scene API all read from the catalog, so
 there is nothing else to update — including the artwork.
 

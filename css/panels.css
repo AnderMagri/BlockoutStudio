@@ -251,6 +251,7 @@
 
 /* A sheet whose height follows its content rather than a fixed textarea. */
 .sheet-auto{ width:min(430px, calc(100vw - 56px)) }
+.sheet-wide{ width:min(600px, calc(100vw - 56px)) }
 
 .modal-body{ display:flex; flex-direction:column; gap:12px; overflow-y:auto }
 

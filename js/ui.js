@@ -84,29 +84,29 @@ function renderViewSeg(){
 
 /* ---------------- object picker ---------------- */
 
-/* A tabbed box of cards rather than a dropdown: the whole catalogue is
-   visible at a glance, and the thumbnails are rendered from the real
-   geometry so a new catalog entry needs no artwork. */
+/* "Add object" opens a modal of tabbed cards. The thumbnails are rendered
+   from the real geometry, so a new catalog entry needs no artwork. The tab
+   you were last on is remembered between openings. */
 
 let activeTab = CATEGORIES[0].id;
 
-function renderObjectTabs(){
-  const host = $('objectTabs');
+function renderPickerTabs(host, cardHost){
   host.innerHTML = '';
-
   for (const cat of CATEGORIES){
     const b = el('button', 'tab' + (cat.id === activeTab ? ' on' : ''), cat.label);
     b.setAttribute('role', 'tab');
     b.setAttribute('aria-selected', cat.id === activeTab ? 'true' : 'false');
-    b.onclick = () => { activeTab = cat.id; renderObjectTabs(); renderObjectCards(); };
+    b.onclick = () => {
+      activeTab = cat.id;
+      renderPickerTabs(host, cardHost);
+      renderPickerCards(cardHost);
+    };
     host.appendChild(b);
   }
 }
 
-function renderObjectCards(){
-  const host = $('objectCards');
+function renderPickerCards(host, close){
   host.innerHTML = '';
-
   const cat = CATEGORIES.find(c => c.id === activeTab) || CATEGORIES[0];
 
   for (const item of cat.items){
@@ -126,14 +126,47 @@ function renderObjectCards(){
 
     card.appendChild(art);
     card.appendChild(el('span', 'card-label', item.label));
-    card.onclick = () => addFromCatalog(item.id);
+    card.onclick = () => {
+      // Close first so the new object is visible the moment it lands.
+      host._close?.();
+      addFromCatalog(item.id);
+    };
     host.appendChild(card);
   }
+  host._close = close ?? host._close;
 }
 
-/** Called once the offscreen renders finish, to swap glyphs for pictures. */
+/** The card grid of the picker while it is open, so late thumbnails land. */
+let openPickerCards = null;
+
+function openObjectPicker(){
+  openModal({
+    title: 'Add object',
+    subtitle: 'Everything is modelled at real scale — a can really is 12 cm tall.',
+    wide: true,
+    build(body, close){
+      const tabs = el('div', 'tabs');
+      tabs.setAttribute('role', 'tablist');
+
+      const cards = el('div', 'cards cards-wide');
+      cards.setAttribute('role', 'tabpanel');
+      cards._close = close;
+
+      renderPickerTabs(tabs, cards);
+      renderPickerCards(cards, close);
+      openPickerCards = cards;
+
+      body.append(tabs, cards);
+    }
+  });
+}
+
+/**
+ * Called when the offscreen thumbnail renders finish. If the picker happens
+ * to be open at that moment, swap its glyph placeholders for the pictures.
+ */
 export function refreshObjectCards(){
-  renderObjectCards();
+  if (openPickerCards?.isConnected) renderPickerCards(openPickerCards);
 }
 
 /* ---------------- lighting gallery ---------------- */
@@ -297,6 +330,8 @@ function openExportModal(){
 /* ---------------- sheets ---------------- */
 
 function openSheet({ title, subtitle, value, actions }){
+  closeAnyModal();
+
   const backdrop = el('div', 'sheet-backdrop');
   const sheet = el('div', 'sheet');
 
@@ -331,10 +366,19 @@ function openSheet({ title, subtitle, value, actions }){
 }
 
 /** A modal whose body is built by a callback — used by the export panel. */
-function openModal({ title, subtitle, build }){
+function openModal({ title, subtitle, build, wide = false }){
+  // Only ever one modal. Without this, clicking a button twice stacks two
+  // sheets and the one underneath keeps handling clicks.
+  closeAnyModal();
+
   const backdrop = el('div', 'sheet-backdrop');
-  const sheet = el('div', 'sheet sheet-auto');
-  const close = () => backdrop.remove();
+  const sheet = el('div', 'sheet sheet-auto' + (wide ? ' sheet-wide' : ''));
+
+  const onKey = e => { if (e.key === 'Escape') close(); };
+  const close = () => {
+    document.removeEventListener('keydown', onKey);
+    backdrop.remove();
+  };
 
   sheet.appendChild(el('h1', null, title));
   if (subtitle) sheet.appendChild(el('p', 'sheet-sub', subtitle));
@@ -351,11 +395,14 @@ function openModal({ title, subtitle, build }){
 
   backdrop.appendChild(sheet);
   backdrop.onclick = e => { if (e.target === backdrop) close(); };
-  document.addEventListener('keydown', function esc(e){
-    if (e.key === 'Escape'){ close(); document.removeEventListener('keydown', esc); }
-  });
+  document.addEventListener('keydown', onKey);
   document.body.appendChild(backdrop);
   return { close };
+}
+
+/** Dismiss whatever sheet is open, if any. */
+function closeAnyModal(){
+  for (const node of document.querySelectorAll('.sheet-backdrop')) node.remove();
 }
 
 async function copyText(text){
@@ -542,8 +589,7 @@ export function applyShot(shot){
 /* ---------------- boot ---------------- */
 
 export function initUI(){
-  renderObjectTabs();
-  renderObjectCards();
+  $('addBtn').onclick = openObjectPicker;
   buildSetControl();
   buildCompositionToggle();
   buildRigGallery();

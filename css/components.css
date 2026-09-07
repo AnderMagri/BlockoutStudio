@@ -169,8 +169,6 @@ input.insp-name::placeholder{ color:var(--label-3) }
 
 /* ---------------- object picker ---------------- */
 
-.objects-panel{ flex:none }
-
 .tabs{
   display:flex; gap:2px;
   background:var(--fill);
@@ -186,8 +184,8 @@ input.insp-name::placeholder{ color:var(--label-3) }
   width:auto; flex:1 0 auto;
   background:transparent;
   border-radius:7px;
-  padding:3px 8px;
-  font-size:10.5px; font-weight:530;
+  padding:4px 10px;
+  font-size:11.5px; font-weight:530;
   color:var(--label-2);
   white-space:nowrap;
 }
@@ -201,12 +199,21 @@ input.insp-name::placeholder{ color:var(--label-3) }
 .cards{
   display:grid;
   grid-template-columns:1fr 1fr;
-  gap:6px;
-  max-height:320px;
+  gap:7px;
+  max-height:min(52vh, 420px);
   overflow-y:auto;
   margin:0 -3px; padding:0 3px 2px;
   scrollbar-width:thin;
   scrollbar-color:rgba(255,255,255,.18) transparent;
+}
+
+/* Inside the Add modal there is room to lay the catalogue out properly. */
+.cards-wide{ grid-template-columns:repeat(4, 1fr) }
+.cards-wide .card-art{ height:62px }
+.cards-wide .card{ padding:9px 6px 8px }
+
+@media (max-width:640px){
+  .cards-wide{ grid-template-columns:repeat(3, 1fr) }
 }
 .cards::-webkit-scrollbar{ width:6px }
 .cards::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.16); border-radius:3px }

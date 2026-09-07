@@ -47,6 +47,9 @@ function buildOne(id, def){
  * @returns {Promise<Map<string,string>>}
  */
 export async function buildThumbnails(){
+  // One frame first, so the studio paints before this starts.
+  await new Promise(requestAnimationFrame);
+
   let renderer;
   try {
     renderer = new THREE.WebGLRenderer({
@@ -109,8 +112,10 @@ export async function buildThumbnails(){
         else n.material?.dispose?.();
       });
 
-      // Yield between items so a slow machine still paints the first frame.
-      await new Promise(r => setTimeout(r, 0));
+      // Deliberately no yield inside the loop. A per-item setTimeout gets
+      // clamped to ~1s in a background tab, which turned 27 quick renders
+      // into half a minute of glyph placeholders. The whole batch is a few
+      // hundred milliseconds, and it already runs after the first frame.
     }
   }
 
