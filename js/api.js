@@ -34,7 +34,7 @@ import * as THREE from 'three';
 import * as store from './store.js';
 import {
   addFromCatalog, addMannequinObject, setPose, applyRig,
-  destroyItem, select, frameSubject, updateTextObject
+  destroyItem, select, frameSubject, updateTextObject, fitShadowCameras
 } from './objects.js';
 import { CATEGORIES, catalogItem } from './catalog.js';
 import { POSES } from './figure.js';
@@ -65,9 +65,13 @@ function layerNamed(name){
  * @param {boolean} [opts.replace] clear existing objects first (default true)
  * @param {object}  [opts.hooks]   {setCamera, setExport} supplied by ui.js so
  *                                 the panels stay in sync with what was built
- * @returns {{added:number, warnings:string[]}}
+ * @returns {Promise<{added:number, warnings:string[]}>}
+ *
+ * Async because some objects cannot be built synchronously — the text
+ * object waits on a typeface load. Awaiting a non-promise is free, so
+ * every creation path goes through the same await.
  */
-export function applyScene(scene, { replace = true, hooks = {} } = {}){
+export async function applyScene(scene, { replace = true, hooks = {} } = {}){
   const warnings = [];
   if (!scene || typeof scene !== 'object') {
     return { added:0, warnings:['Scene is not an object.'] };
@@ -90,7 +94,7 @@ export function applyScene(scene, { replace = true, hooks = {} } = {}){
     const previousActive = store.state.activeLayerId;
     if (layer) store.state.activeLayerId = layer.id;
 
-    const item = spec.id === 'mannequin' ? addMannequinObject() : addFromCatalog(spec.id);
+    const item = await (spec.id === 'mannequin' ? addMannequinObject() : addFromCatalog(spec.id));
     store.state.activeLayerId = previousActive;
 
     if (!item){ warnings.push(`Could not build "${spec.id}"`); continue; }
@@ -122,7 +126,7 @@ export function applyScene(scene, { replace = true, hooks = {} } = {}){
       if (spec.text != null)  p.text = String(spec.text);
       if (spec.size != null)  p.size = +spec.size;
       if (spec.depth != null) p.depth = +spec.depth;
-      updateTextObject(item);
+      await updateTextObject(item);
     }
 
     if (spec.id === 'mannequin' && spec.pose){
@@ -142,6 +146,7 @@ export function applyScene(scene, { replace = true, hooks = {} } = {}){
   if (scene.export) hooks.setExport?.(scene.export);
   if (scene.camera) hooks.setCamera?.(scene.camera);
 
+  fitShadowCameras();
   store.applyVisibility();
   store.changed();
   hooks.afterBuild?.();
@@ -216,11 +221,15 @@ export function vocabulary(){
 
 /* ---------------- public handle ---------------- */
 
-/** Install window.BlockoutStudio. ui.js supplies the camera/export hooks. */
+/**
+ * Install window.BlockoutStudio. ui.js supplies the hooks that reach into
+ * panel state. This object is the whole remote-control surface: the MCP
+ * bridge calls nothing else.
+ */
 export function installGlobalAPI(hooks){
   const api = {
-    applyScene: (scene, opts = {}) => {
-      const result = applyScene(scene, { ...opts, hooks });
+    applyScene: async (scene, opts = {}) => {
+      const result = await applyScene(scene, { ...opts, hooks });
       if (result.warnings.length) console.warn('[Blockout Studio]', result.warnings);
       toast(`Built ${result.added} object${result.added === 1 ? '' : 's'}` +
             (result.warnings.length ? ` · ${result.warnings.length} warning(s)` : ''));
@@ -228,8 +237,33 @@ export function installGlobalAPI(hooks){
     },
     serializeScene: () => serializeScene(hooks.cameraState?.() ?? {}),
     vocabulary,
-    frameSubject
+    frameSubject,
+
+    /** Adjust the camera without rebuilding anything. */
+    setCamera(spec){
+      hooks.setCamera?.(spec);
+      return { ok:true, camera: hooks.cameraState?.() };
+    },
+
+    /** Swap the lighting rig, leaving the objects alone. */
+    setLighting(rigId){
+      const rig = applyRig(rigId);
+      if (!rig) throw new Error(`Unknown lighting rig: "${rigId}"`);
+      hooks.setRig?.(rig);
+      return { ok:true, rig: rig.id, description: rig.note };
+    },
+
+    /** The studio's own prose description of the current setup. */
+    describeSetup: () => hooks.describeSetup?.() ?? '',
+
+    /**
+     * Render a pass and return the pixels, so a caller can save them
+     * somewhere the UI's download path cannot reach.
+     */
+    capturePass: (pass, resolution, opts) =>
+      hooks.capturePass?.(pass, resolution, opts)
   };
+
   window.BlockoutStudio = api;
   return api;
 }

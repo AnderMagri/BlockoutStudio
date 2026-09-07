@@ -1,0 +1,9 @@
+{
+  "name": "blockout-studio-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "MCP connector for Blockout Studio. No dependencies by design.",
+  "bin": { "blockout-studio-mcp": "./server.js" },
+  "engines": { "node": ">=18" }
+}

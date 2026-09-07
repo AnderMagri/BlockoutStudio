@@ -87,6 +87,7 @@ function registerMesh(mesh, sub, nameBase){
   const item = store.addItem({
     name: store.nextName(nameBase), kind:'mesh', sub, obj:mesh
   });
+  fitShadowCameras();
   store.applyVisibility();
   select(item);
   store.changed();
@@ -281,6 +282,7 @@ export function applyRig(rigId){
     addLightObject(spec, layer.id, spec.name);
   }
 
+  fitShadowCameras();
   store.applyVisibility();
   store.changed();
   return rig;
@@ -597,6 +599,50 @@ export function frameSubject(camera, margin = 1.22){
   if (camera === activeCamera()) orbit.target.copy(sphere.center);
   orbit.update();
   return true;
+}
+
+/* ---------------- shadows ---------------- */
+
+const _shadowBox = new THREE.Box3();
+
+/**
+ * Size every shadow camera to the subject.
+ *
+ * A fixed shadow frustum tuned for a 12 cm bottle draws a hard-edged pool
+ * of light on the floor around a 1.75 m figure — everything outside the
+ * frustum is simply never shadowed. Too generous a frustum instead wastes
+ * shadow-map resolution and gives soft, blocky contact shadows. So it
+ * follows the content.
+ */
+export function fitShadowCameras(){
+  const items = store.subjectMeshes();
+  if (!items.length) return;
+
+  _shadowBox.makeEmpty();
+  for (const item of items) _shadowBox.expandByObject(item.obj);
+  if (_shadowBox.isEmpty()) return;
+
+  const sphere = _shadowBox.getBoundingSphere(new THREE.Sphere());
+  const radius = Math.max(sphere.radius * 1.7, 0.35);
+
+  for (const item of store.itemsOfKind('light')){
+    const shadow = item.obj.shadow;
+    if (!shadow) continue;
+
+    const cam = shadow.camera;
+    const reach = (item.params.dist || 1.2) + radius * 2;
+
+    if (cam.isOrthographicCamera){
+      cam.left = cam.bottom = -radius;
+      cam.right = cam.top   =  radius;
+      cam.near = 0.05;
+      cam.far  = Math.max(reach, 6);
+    } else {
+      cam.far = Math.max(reach, 6);
+    }
+    cam.updateProjectionMatrix();
+    shadow.needsUpdate = true;
+  }
 }
 
 /* ---------------- views ---------------- */

@@ -9,6 +9,7 @@ import {
   updateHelpers, select, frameSubject, lookThrough
 } from './objects.js';
 import { initUI, applyShot } from './ui.js';
+import { connectBridge } from './bridge.js';
 import { SHOTS } from './optics.js';
 import { $ } from './util.js';
 
@@ -34,6 +35,9 @@ function boot(){
   setBeforeRender(updateHelpers);
   store.applyVisibility();
   store.changed();
+
+  // Talk to the MCP server if one is running. Harmless when there isn't.
+  connectBridge();
 
   resize();
   tick();

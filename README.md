@@ -110,21 +110,84 @@ BlockoutStudio.serializeScene()  // the current scene as JSON
 BlockoutStudio.applyScene({ ... })
 ```
 
-### Would an MCP connector be better?
+## Connecting it to an assistant (MCP)
 
-Yes, eventually — and this is the groundwork for it.
+`mcp/server.js` is an MCP server with **zero dependencies** — nothing to
+install, nothing to fail during a demo. It does three jobs at once:
 
-Copy-paste works today with zero infrastructure, which is why it exists
-first. Its limit is that it is not a conversation: you paste, look, and
-paste again.
+1. Serves the studio at <http://localhost:8787>
+2. Holds an event stream open to the page so an assistant can drive it
+3. Speaks MCP over stdio to Claude
 
-An MCP server would let an assistant build and adjust the scene directly
-while you talk about it — "move the key light round to the left, go
-longer on the lens". That needs a small local Node process and a
-WebSocket to this page, the same shape as a Figma plugin bridge. When it
-gets built, its tools should call `applyScene` and `serializeScene` and
-nothing else. **The JSON format above is the contract either way**, so
-nothing you learn now is wasted.
+### Set up
+
+Register it once with Claude Code:
+
+```bash
+claude mcp add blockout -- node /absolute/path/to/BlockoutStudio/mcp/server.js
+```
+
+For Claude Desktop, add this to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "blockout": {
+      "command": "node",
+      "args": ["/absolute/path/to/BlockoutStudio/mcp/server.js"]
+    }
+  }
+}
+```
+
+Then open <http://localhost:8787> and leave the tab open. The dot in the
+top-left pill turns purple when the studio and the assistant are talking.
+
+You can also run the server by hand — it serves the site either way:
+
+```bash
+node mcp/server.js
+```
+
+### Tools
+
+| Tool | What it does |
+|---|---|
+| `studio_status` | Is a page connected? Call this first if anything fails |
+| `get_vocabulary` | Every object id, pose, rig, lens and shot it understands |
+| `get_scene` | The current scene as JSON |
+| `build_scene` | Build a scene from a description |
+| `set_camera` | Change lens, aperture, focus or framing |
+| `set_lighting` | Swap the lighting rig |
+| `export_image` | Render a pass to `exports/` and return the file path |
+| `describe_setup` | The prose description of the current setup |
+
+`export_image` returns a **path rather than image data**. That is
+deliberate: a 1536px depth map is about 2 MB of base64, which has no
+business travelling through a tool result — and a path means the
+assistant can open the file and actually look at what it made, then
+adjust and re-render.
+
+### How it works
+
+The server pushes commands to the page over Server-Sent Events; results
+and rendered PNGs come back as ordinary POSTs. SSE rather than a
+WebSocket because it is plain HTTP — no handshake to implement, no frame
+masking to get wrong, and `EventSource` reconnects by itself when the
+page reloads or the server restarts.
+
+Everything routes through `window.BlockoutStudio`. If a command cannot be
+expressed through that object, the fix belongs in `api.js`, not in the
+bridge.
+
+### Known limits
+
+- **The page must be open.** No tab, no tools. `studio_status` says so
+  plainly rather than hanging.
+- One studio tab at a time is the sane setup. Several tabs all receive
+  the commands and the first answer wins.
+- The server binds to `127.0.0.1` only.
+- Port 8787 by default; set `BLOCKOUT_PORT` to change it.
 
 ---
 
@@ -173,7 +236,10 @@ js/
   export.js         render / depth / normal / mask
   prompt.js         setup → prompt text
   api.js            scene JSON in and out
+  bridge.js         talks to the MCP server
   ui.js             the HUD wiring
+mcp/
+  server.js         MCP server + static host, zero dependencies
 ```
 
 ---

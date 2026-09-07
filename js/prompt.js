@@ -10,6 +10,7 @@ import * as store from './store.js';
 import { dofCharacter, equivFromFocal } from './optics.js';
 import { kelvinName, mm } from './util.js';
 import { describeLight } from './lights.js';
+import { labelFor } from './catalog.js';
 
 /** Count the subject shapes so the prompt can mention the arrangement. */
 function describeSubject(){
@@ -21,9 +22,11 @@ function describeSubject(){
 
   const counts = new Map();
   for (const m of meshes){
+    // Describe what a thing IS, from the catalog — not what the user
+    // renamed it to. "Hero bottle" should still read as a bottle.
     const key = m.sub === 'text' ? 'lettering'
               : m.sub === 'spline' ? 'curved form'
-              : m.name.replace(/ \d+$/, '').toLowerCase();
+              : labelFor(m.sub).toLowerCase();
     counts.set(key, (counts.get(key) || 0) + 1);
   }
 

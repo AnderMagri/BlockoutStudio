@@ -61,16 +61,20 @@ export const extraHelpers = [];
 const matGround = new THREE.MeshStandardMaterial({ color:0x6a6a6a, roughness:0.85 });
 const matBack   = new THREE.MeshStandardMaterial({ color:0x5a5a5a, roughness:0.90 });
 
-// The floor stops exactly where the backdrop starts. A floor that carries on
-// behind the wall shows up as a bright band above the seam in every render.
-export const ground = new THREE.Mesh(new THREE.PlaneGeometry(8, 8), matGround);
+// Big enough that the edges never enter frame, including behind a 1.75 m
+// figure with the camera pulled well back. The floor stops exactly where the
+// backdrop starts — a floor that carries on behind the wall shows up as a
+// bright band above the seam.
+const SET = 40;
+
+export const ground = new THREE.Mesh(new THREE.PlaneGeometry(SET, SET), matGround);
 ground.rotation.x = -Math.PI / 2;
-ground.position.set(0, 0, 2.8);
+ground.position.set(0, 0, SET / 2 - 1.2);
 ground.receiveShadow = true;
 scene.add(ground);
 
-export const backdrop = new THREE.Mesh(new THREE.PlaneGeometry(8, 5), matBack);
-backdrop.position.set(0, 2.5, -1.2);
+export const backdrop = new THREE.Mesh(new THREE.PlaneGeometry(SET, SET * 0.6), matBack);
+backdrop.position.set(0, SET * 0.3, -1.2);
 backdrop.receiveShadow = true;
 scene.add(backdrop);
 

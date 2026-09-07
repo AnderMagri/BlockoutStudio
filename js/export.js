@@ -139,28 +139,46 @@ const stamp = () => new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
 
 /* ---------------- passes ---------------- */
 
-export function exportRender(longEdge){
+/**
+ * Render one pass and hand back the pixels rather than saving them.
+ *
+ * Every export goes through here. The UI turns the result into a download;
+ * the MCP bridge posts it to disk so an assistant can open and inspect it.
+ *
+ * @param {'render'|'depth'|'normal'|'mask'} pass
+ * @returns {{dataUrl:string, filename:string, note:string, width:number, height:number}}
+ */
+export function capturePass(pass, longEdge, opts = {}){
   const { width, height } = exportSize(longEdge);
-  const url = captureFrame(width, height);
-  download(url, `blockout-render-${stamp()}.png`);
-  toast(`Render exported at ${width}×${height}`);
+
+  switch (pass){
+    case 'depth':  return { ...depthPass(width, height, opts), width, height };
+    case 'normal': return { ...normalPass(width, height), width, height };
+    case 'mask':   return { ...maskPass(width, height), width, height };
+    case 'render':
+    default:       return {
+      dataUrl: captureFrame(width, height),
+      filename: `blockout-render-${stamp()}.png`,
+      note: `Lit render at ${width}×${height}`,
+      width, height
+    };
+  }
 }
 
-export function exportDepth(longEdge, { subjectOnly = true, invert = false } = {}){
-  const { width, height } = exportSize(longEdge);
+export function exportRender(longEdge){
+  const shot = capturePass('render', longEdge);
+  download(shot.dataUrl, shot.filename);
+  toast(shot.note);
+}
+
+function depthPass(width, height, { subjectOnly = true, invert = false } = {}){
   const camera = activeCamera();
 
   const pool = subjectOnly ? store.subjectMeshes() : store.visibleMeshes();
-  if (!pool.length){
-    toast('Nothing visible to measure depth from.', true);
-    return;
-  }
+  if (!pool.length) throw new Error('Nothing visible to measure depth from.');
 
   const range = viewDepthRange(pool, camera);
-  if (!range){
-    toast('Could not work out a depth range.', true);
-    return;
-  }
+  if (!range) throw new Error('Could not work out a depth range.');
 
   depthMaterial.uniforms.uNear.value   = range.near;
   depthMaterial.uniforms.uFar.value    = range.far;
@@ -169,32 +187,49 @@ export function exportDepth(longEdge, { subjectOnly = true, invert = false } = {
   // Whatever "far" maps to is what the empty background should be.
   const bg = new THREE.Color(invert ? 0xffffff : 0x000000);
 
-  const url = captureFrame(width, height, {
+  const dataUrl = captureFrame(width, height, {
     background: bg,
     overrideMaterial: depthMaterial,
     toneMapping: THREE.NoToneMapping
   });
 
-  download(url, `blockout-depth-${stamp()}.png`);
-  toast(`Depth exported · range ${(range.near * 100).toFixed(1)}–${(range.far * 100).toFixed(1)} cm`);
+  return {
+    dataUrl,
+    filename: `blockout-depth-${stamp()}.png`,
+    note: `Depth map, near = ${invert ? 'black' : 'white'}, fitted to ` +
+          `${(range.near * 100).toFixed(1)}\u2013${(range.far * 100).toFixed(1)} cm from the lens`
+  };
+}
+
+export function exportDepth(longEdge, opts = {}){
+  try {
+    const shot = capturePass('depth', longEdge, opts);
+    download(shot.dataUrl, shot.filename);
+    toast(shot.note);
+  } catch (err){ toast(err.message, true); }
+}
+
+function normalPass(width, height){
+  return {
+    dataUrl: captureFrame(width, height, {
+      background: new THREE.Color(0x8080ff),   // flat tangent-space normal
+      overrideMaterial: normalMaterial,
+      toneMapping: THREE.NoToneMapping
+    }),
+    filename: `blockout-normal-${stamp()}.png`,
+    note: `Normal map at ${width}\u00d7${height}`
+  };
 }
 
 export function exportNormal(longEdge){
-  const { width, height } = exportSize(longEdge);
-  const url = captureFrame(width, height, {
-    background: new THREE.Color(0x8080ff),   // flat tangent-space normal
-    overrideMaterial: normalMaterial,
-    toneMapping: THREE.NoToneMapping
-  });
-  download(url, `blockout-normal-${stamp()}.png`);
-  toast(`Normal map exported at ${width}×${height}`);
+  const shot = capturePass('normal', longEdge);
+  download(shot.dataUrl, shot.filename);
+  toast(shot.note);
 }
 
-export function exportMask(longEdge){
+function maskPass(width, height){
   const layer = store.activeLayer();
-  if (!layer){ toast('No active layer to mask.', true); return; }
-
-  const { width, height } = exportSize(longEdge);
+  if (!layer) throw new Error('No active layer to mask.');
 
   const white = new THREE.MeshBasicMaterial({ color: 0xffffff });
   const black = new THREE.MeshBasicMaterial({ color: 0x000000 });
@@ -212,7 +247,7 @@ export function exportMask(longEdge){
     });
   }
 
-  const url = captureFrame(width, height, {
+  const dataUrl = captureFrame(width, height, {
     background: new THREE.Color(0x000000),
     toneMapping: THREE.NoToneMapping
   });
@@ -221,6 +256,17 @@ export function exportMask(longEdge){
   white.dispose();
   black.dispose();
 
-  download(url, `blockout-mask-${slug(layer.name)}-${stamp()}.png`);
-  toast(`Mask exported for “${layer.name}”`);
+  return {
+    dataUrl,
+    filename: `blockout-mask-${slug(layer.name)}-${stamp()}.png`,
+    note: `Mask isolating the “${layer.name}” layer`
+  };
+}
+
+export function exportMask(longEdge){
+  try {
+    const shot = capturePass('mask', longEdge);
+    download(shot.dataUrl, shot.filename);
+    toast(shot.note);
+  } catch (err){ toast(err.message, true); }
 }

@@ -14,7 +14,7 @@ import {
   duplicateSelected, destroySelected, updateLight, updateTextObject,
   applyCameraParams, lookThrough, refreshOutline, setPose, frameSubject
 } from './objects.js';
-import { gizmo, activeCamera } from './viewport.js';
+import { gizmo, activeCamera, renderer } from './viewport.js';
 import { rebuildSpline, addControlPoint, removeControlPoint } from './spline.js';
 import { POSES } from './figure.js';
 import {
@@ -278,6 +278,12 @@ function cameraControls(host, item){
 
   host.appendChild(dofBox);
   refreshDof();
+
+  slider(host, 'Exposure', {
+    min:-3, max:3, step:0.1, value:Math.log2(renderer.toneMappingExposure),
+    format: v => `${v >= 0 ? '+' : ''}${v.toFixed(1)} EV`,
+    onInput: v => { renderer.toneMappingExposure = Math.pow(2, v); }
+  });
 
   section(host, 'Framing');
   tileGrid(host,

@@ -22,7 +22,7 @@ import {
   FORMATS, ASPECTS, RESOLUTIONS, SHOTS,
   focalFromEquiv, depthOfField
 } from './optics.js';
-import { exportRender, exportDepth, exportNormal, exportMask, exportSize } from './export.js';
+import { exportRender, exportDepth, exportNormal, exportMask, exportSize, capturePass } from './export.js';
 import { buildPrompt } from './prompt.js';
 import { renderLayers } from './layers.js';
 import { renderInspector } from './inspector.js';
@@ -376,13 +376,13 @@ function openSceneSheet(){
       value:JSON.stringify(api.serializeScene(), null, 2),
       actions:[
         { label:'Copy', run:(ta) => copyText(ta.value) },
-        { label:'Build', cls:'btn-accent', run:(ta, close) => {
+        { label:'Build', cls:'btn-accent', run:async (ta, close) => {
             try {
               const scene = JSON.parse(ta.value);
-              api.applyScene(scene);
               close();
+              await api.applyScene(scene);
             } catch (err){
-              toast(`Could not parse: ${err.message}`, true);
+              toast(`Could not build: ${err.message}`, true);
             }
           } }
       ]
@@ -454,6 +454,25 @@ const apiHooks = {
     syncReadout();
   },
   setRig(rig){ currentRig = rig; markRig(rig.id); },
+
+  /** The prose description, built from the same live state as the sheet. */
+  describeSetup(){
+    const p = currentParams();
+    const format = currentFormat();
+    const focalReal = focalFromEquiv(p.equiv, format);
+    return buildPrompt({
+      format, focal:focalReal, fstop:p.fstop, focusM:p.focus,
+      dof: depthOfField(focalReal, p.fstop, p.focus, format),
+      shot: currentShot, rig: currentRig, aspect: getAspect()
+    });
+  },
+
+  /** Render a pass with the panel's current depth options applied. */
+  capturePass(pass, resolution){
+    return capturePass(pass, resolution || exportRes, {
+      subjectOnly: depthSubject, invert: depthInvert
+    });
+  },
   afterBuild(){ frameSubject(activeCamera()); syncReadout(); },
   cameraState(){
     const p = currentParams();
