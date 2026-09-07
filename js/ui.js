@@ -56,8 +56,9 @@ export const setCurrentShot = shot => { currentShot = shot; };
 export function syncReadout(){
   const p = currentParams();
   const name = activeCameraItem()?.name ?? 'Scene';
-  $('viewReadout').textContent =
-    `${name} · ${Math.round(p.equiv)}mm · f/${p.fstop} · ${getAspect().id}`;
+  $('viewReadout').textContent = isFreeCamera()
+    ? `arranging · ${getAspect().id} frame`
+    : `${name} · ${Math.round(p.equiv)}mm · f/${p.fstop} · ${getAspect().id}`;
   renderViewSeg();
 }
 
@@ -70,13 +71,21 @@ function renderViewSeg(){
 
   const current = activeCameraItem();
 
-  const scene = el('button', isFreeCamera() ? 'on' : '', 'Scene');
+  /* Two states that look very different, because confusing "arranging the
+     set" with "framing the shot" wastes real time. Arranging is a grey
+     orbit view; a camera view is accent-coloured and named. */
+  const scene = el('button', 'seg-scene' + (isFreeCamera() ? ' on' : ''));
+  scene.innerHTML = '<span class="seg-ico">⟳</span>Arrange';
   scene.title = 'Free orbit view for arranging the set';
-  scene.onclick = () => { lookThrough(null); syncReadout(); };
+  scene.onclick = () => { lookThrough(null); select(null); syncReadout(); };
   host.appendChild(scene);
 
   for (const cam of store.itemsOfKind('camera')){
-    const b = el('button', cam === current ? 'on' : '', cam.name);
+    const live = cam === current;
+    const b = el('button', 'seg-cam' + (live ? ' on' : ''));
+    b.innerHTML = `<span class="seg-ico">${cam.params.locked ? '🔒' : '▣'}</span>` +
+                  cam.name.replace(/^Camera /, 'Cam ');
+    b.title = live ? `Looking through ${cam.name}` : `Look through ${cam.name}`;
     b.onclick = () => { lookThrough(cam); select(cam); syncReadout(); };
     host.appendChild(b);
   }

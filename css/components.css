@@ -14,7 +14,14 @@
 
 /* ---------------- preset gallery ---------------- */
 
-.gallery{ display:grid; grid-template-columns:1fr 1fr; gap:6px }
+.gallery{
+  display:grid; grid-template-columns:1fr 1fr; gap:6px;
+  margin-bottom:9px;
+}
+
+/* Equal rows regardless of label length — one wrapping label used to make
+   its whole row taller than the rest. */
+.gallery .tile{ min-height:41px }
 
 .tile{
   display:flex; flex-direction:column; gap:1px;
@@ -129,6 +136,16 @@
 .layer .empty{ font-size:11px; color:var(--label-3); padding:5px 9px }
 
 /* ---------------- inspector ---------------- */
+
+/* Vertical rhythm for a panel whose contents are assembled in JS: without
+   this, a gallery and the select beneath it sit flush and read as one
+   overflowing block. */
+#inspector > * + *{ margin-top:7px }
+#inspector > h2{ margin-top:16px }
+#inspector > .gallery + select,
+#inspector > .gallery + button,
+#inspector > .field + input[type=range]{ margin-top:0 }
+#inspector > .field{ margin-bottom:0 }
 
 .insp-head{ display:flex; align-items:center; gap:7px; margin-bottom:10px }
 .insp-kind{

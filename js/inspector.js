@@ -12,7 +12,8 @@
 import * as store from './store.js';
 import {
   duplicateSelected, destroySelected, updateLight, updateTextObject,
-  applyCameraParams, lookThrough, refreshOutline, setPose, frameSubject
+  applyCameraParams, lookThrough, refreshOutline, setPose, frameSubject,
+  setCameraLock
 } from './objects.js';
 import { gizmo, activeCamera, renderer } from './viewport.js';
 import { rebuildSpline, addControlPoint, removeControlPoint } from './spline.js';
@@ -230,15 +231,34 @@ function mannequinControls(host, item){
 function cameraControls(host, item){
   const p = item.params;
 
-  button(host, 'Look through', () => { lookThrough(item); renderInspector(true); }, 'btn-accent');
+  const viewing = !!item.isActiveView;
+  button(host,
+    viewing ? 'Back to scene view' : 'Look through',
+    () => { lookThrough(viewing ? null : item); renderInspector(true); syncFromUI(); },
+    viewing ? 'btn-quiet' : 'btn-accent');
+
+  const lock = el('label', 'switch');
+  lock.appendChild(document.createTextNode('Lock framing'));
+  const lockBox = el('input');
+  lockBox.type = 'checkbox';
+  lockBox.checked = !!p.locked;
+  lockBox.onchange = () => { setCameraLock(item, lockBox.checked); renderInspector(true); };
+  lock.appendChild(lockBox);
+  host.appendChild(lock);
+
+  if (p.locked){
+    host.appendChild(el('p', 'caption',
+      'Locked — dragging will not move this camera. The lens still works.'));
+  }
 
   section(host, 'Lens');
   tileGrid(host,
-    LENSES.map(l => ({ ...l, meta:`f/${l.fstop.toFixed(1)}` })),
+    LENSES.map(l => ({ ...l, meta:`${l.character} · f/${l.fstop.toFixed(1)}` })),
     l => Math.round(p.equiv) === l.equiv,
     l => { p.equiv = l.equiv; p.fstop = l.fstop; applyCameraParams(item); syncFromUI(); });
 
   const format = el('select');
+  format.style.marginTop = '2px';
   fillSelect(format, FORMAT_LIST.map(f => ({ value:f.id, label:f.name })), p.formatId);
   format.onchange = e => {
     p.formatId = e.target.value;
@@ -292,7 +312,8 @@ function cameraControls(host, item){
     () => false,
     s => applyShotFromInspector(s, item));
 
-  button(host, 'Fit to subject', () => frameSubject(activeCamera()), 'btn-quiet');
+  const fit = button(host, 'Fit to subject', () => frameSubject(activeCamera()), 'btn-quiet');
+  fit.style.marginTop = '2px';
 
   host.appendChild(el('p', 'caption',
     'Move and aim this camera with the gizmo like any other object.'));

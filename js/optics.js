@@ -28,13 +28,13 @@ export const FSTOPS = [1.4, 1.8, 2.0, 2.8, 4.0, 5.6, 8.0, 11, 16];
  * like 85 mm whichever format you are on.
  */
 export const LENSES = [
-  { id:'w24',  name:'24 mm wide',    equiv:24,  fstop:8.0, note:'wide angle, strong perspective, product in its environment' },
-  { id:'w35',  name:'35 mm reportage',equiv:35, fstop:5.6, note:'reportage framing, mild perspective, context around the product' },
-  { id:'n50',  name:'50 mm normal',  equiv:50,  fstop:2.8, note:'normal lens, natural perspective' },
-  { id:'p85',  name:'85 mm product', equiv:85,  fstop:2.0, note:'short telephoto, gentle compression, classic product framing' },
-  { id:'m100', name:'100 mm macro',  equiv:100, fstop:4.0, note:'macro lens, tight detail, shallow plane of focus' },
-  { id:'t135', name:'135 mm tele',   equiv:135, fstop:2.8, note:'telephoto compression, background pulled forward' },
-  { id:'t200', name:'200 mm long',   equiv:200, fstop:4.0, note:'long telephoto, flat compressed perspective' }
+  { id:'w24',  name:'24 mm',  character:'wide',      equiv:24,  fstop:8.0, note:'wide angle, strong perspective, product in its environment' },
+  { id:'w35',  name:'35 mm',  character:'reportage', equiv:35,  fstop:5.6, note:'reportage framing, mild perspective, context around the product' },
+  { id:'n50',  name:'50 mm',  character:'normal',    equiv:50,  fstop:2.8, note:'normal lens, natural perspective' },
+  { id:'p85',  name:'85 mm',  character:'product',   equiv:85,  fstop:2.0, note:'short telephoto, gentle compression, classic product framing' },
+  { id:'m100', name:'100 mm', character:'macro',     equiv:100, fstop:4.0, note:'macro lens, tight detail, shallow plane of focus' },
+  { id:'t135', name:'135 mm', character:'tele',      equiv:135, fstop:2.8, note:'telephoto compression, background pulled forward' },
+  { id:'t200', name:'200 mm', character:'long',      equiv:200, fstop:4.0, note:'long telephoto, flat compressed perspective' }
 ];
 
 /**

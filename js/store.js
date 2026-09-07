@@ -176,6 +176,10 @@ export function applyVisibility(){
     if (on && item.kind === 'set') on = setPieceLive(item.sub);
 
     item.obj.visible = on;
-    if (item.helper) item.helper.visible = on;
+
+    // A camera cannot see its own frustum. Without this the helper of the
+    // camera you are looking through is drawn from the inside, filling the
+    // view with lines — which reads as "look through is broken".
+    if (item.helper) item.helper.visible = on && !item.isActiveView;
   }
 }

@@ -37,7 +37,9 @@ entry gets its artwork for free and the picture can never drift from the
 shape it represents.
 
 **Cameras are objects.** Drop one in, move it with the gizmo, select it to
-set the lens. Focal lengths are full-frame equivalents and the real focal
+set the lens. The view switcher at the top left separates *arranging* the
+set from *framing* through a camera, and a camera can be locked so a stray
+drag cannot move a framing you were happy with. Focal lengths are full-frame equivalents and the real focal
 length is derived from the sensor format you choose, so "85 mm" looks like
 85 mm on APS-C too. Depth of field is computed from the actual optics —
 hyperfocal distance, near and far limits, and a circle of confusion that

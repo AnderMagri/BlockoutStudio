@@ -218,7 +218,8 @@ export function addCameraObject(params = {}){
     formatId: params.formatId ?? 'ff',
     equiv:    params.equiv    ?? 85,
     fstop:    params.fstop    ?? 2.8,
-    focus:    params.focus    ?? 0.6
+    focus:    params.focus    ?? 0.6,
+    locked:   params.locked   ?? false
   };
   const format = FORMATS[p.formatId];
 
@@ -348,10 +349,17 @@ export function select(item, handleMesh = null){
     highlightJointHandle(item.handles, handleMesh);
   }
 
+  const lockedCamera = item.kind === 'camera' && item.params.locked;
+  const viewingSelf   = item.kind === 'camera' && item.isActiveView;
+
   if (handleMesh?.userData.joint){
     // A joint only ever rotates — translating one would tear the figure apart.
     gizmo.attach(handleMesh.userData.joint.node);
     gizmo.setMode('rotate');
+  } else if (lockedCamera || viewingSelf){
+    // Nothing to grab: a locked camera must not move, and a camera you are
+    // looking through would put its own gizmo across the whole frame.
+    gizmo.detach();
   } else {
     gizmo.attach(handleMesh || item.obj);
   }
@@ -675,15 +683,45 @@ export function fitShadowCameras(){
 
 /** Switch the viewport to the free camera or to a placed camera item. */
 export function lookThrough(item){
+  // Exactly one camera is the active view; store.applyVisibility reads this
+  // to keep that camera's own helper hidden.
+  for (const cam of store.itemsOfKind('camera')) cam.isActiveView = (cam === item);
+
   if (!item){
     setActiveCamera(freeCamera, new THREE.Vector3(0, 0.06, 0));
-    for (const cam of store.itemsOfKind('camera')) if (cam.helper) cam.helper.visible = true;
+    orbit.enabled = true;
+    store.applyVisibility();
+    store.changed();
     return;
   }
-  // A camera cannot see its own frustum lines.
-  for (const cam of store.itemsOfKind('camera')){
-    if (cam.helper) cam.helper.visible = (cam !== item);
-  }
+
+  // The gizmo would otherwise sit at the eye, drawn across the whole frame.
+  if (gizmo.object === item.obj) gizmo.detach();
+
   const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(item.obj.quaternion);
   setActiveCamera(item.obj, item.obj.position.clone().addScaledVector(fwd, item.params.focus));
+
+  // A locked camera holds its framing: dragging must not orbit it.
+  orbit.enabled = !item.params.locked;
+
+  store.applyVisibility();
+  store.changed();
+}
+
+/**
+ * Lock a camera's framing.
+ *
+ * Looking through a camera means orbiting *moves that camera*, so a framing
+ * you were happy with is one stray drag from gone. Locking stops the orbit
+ * and keeps the gizmo off it; the lens controls still work.
+ */
+export function setCameraLock(item, locked){
+  if (!item || item.kind !== 'camera') return false;
+  item.params.locked = !!locked;
+
+  if (locked && gizmo.object === item.obj) gizmo.detach();
+  if (item.isActiveView) orbit.enabled = !locked;
+
+  store.changed();
+  return item.params.locked;
 }

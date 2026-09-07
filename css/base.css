@@ -238,3 +238,22 @@ input[type=range]:focus-visible::-webkit-slider-thumb{
 @media (prefers-reduced-motion:reduce){
   *{ transition:none !important; animation:none !important }
 }
+
+/* ---------------- view switcher ---------------- */
+
+.seg .seg-ico{
+  font-size:9px;
+  margin-right:5px;
+  opacity:.75;
+  display:inline-block;
+  vertical-align:1px;
+}
+
+/* Arranging the set and framing a shot are different jobs, so they read
+   differently: grey for the orbit view, accent for a live camera. */
+.seg .seg-cam.on{
+  background:var(--accent);
+  color:#fff;
+  box-shadow:0 1px 3px rgba(0,0,0,.32);
+}
+.seg .seg-cam.on .seg-ico{ opacity:1 }
