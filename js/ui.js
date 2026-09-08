@@ -10,7 +10,7 @@
 import * as store from './store.js';
 import {
   renderer, activeCamera, isFreeCamera, freeCamera, gizmo,
-  setAspect, getAspect, resize
+  setAspect, getAspect, resize, setPreviewCamera
 } from './viewport.js';
 import {
   addFromCatalog, applyRig, select, duplicateSelected, destroySelected,
@@ -581,6 +581,46 @@ function buildPivotToggle(){
   renderPivotBtn();
 }
 
+/* ---------------- camera preview ---------------- */
+
+/**
+ * The live inset of what the camera sees, so a set can be arranged and the
+ * shot judged at once. On by default: the whole job here is composing a
+ * picture, and working blind in the Scene view is what the switching back
+ * and forth was for.
+ */
+let previewOn = true;
+
+function renderPreviewBtn(){
+  const b = $('previewBtn');
+  if (!b) return;
+  b.textContent = previewOn ? '◱ Preview' : '◱ Preview off';
+  b.setAttribute('aria-pressed', previewOn ? 'true' : 'false');
+  b.classList.toggle('on', previewOn);
+}
+
+/**
+ * Which camera the inset shows: the one you have selected if it is a
+ * camera, otherwise the first in the scene. Nothing while you are already
+ * looking through a camera — the main view is the preview then.
+ */
+function syncPreview(){
+  if (!previewOn || !isFreeCamera()){ setPreviewCamera(null); return; }
+  const sel = store.state.selected;
+  const cam = sel?.kind === 'camera' ? sel : store.itemsOfKind('camera')[0];
+  setPreviewCamera(cam ?? null);
+}
+
+function buildPreviewToggle(){
+  $('previewBtn').onclick = () => {
+    previewOn = !previewOn;
+    renderPreviewBtn();
+    syncPreview();
+    toast(previewOn ? 'Camera preview on' : 'Camera preview off');
+  };
+  renderPreviewBtn();
+}
+
 /* ---------------- scenes ---------------- */
 
 const ago = iso => {
@@ -924,6 +964,7 @@ export function initUI(){
     toast('New scene');
   };
   buildPivotToggle();
+  buildPreviewToggle();
   buildSetControl();
   buildCompositionToggle();
   buildRigGallery();
@@ -936,11 +977,12 @@ export function initUI(){
     store.changed();
   };
 
-  store.on('change', () => { renderLayers(); renderViewSeg(); });
+  store.on('change', () => { renderLayers(); renderViewSeg(); syncPreview(); });
   store.on('names',  () => { renderLayers(); renderViewSeg(); });
 
   installGlobalAPI(apiHooks);
   applyFreeCameraParams();
+  syncPreview();
 
   renderLayers();
   renderInspector(true);

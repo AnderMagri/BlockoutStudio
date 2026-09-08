@@ -300,8 +300,96 @@ orbit.addEventListener('start', () => {
 /* ---------------- render loop ---------------- */
 
 const clearColor = new THREE.Color(0x0D0D0D);
+const previewBorder = new THREE.Color(0xBF5AF2);
 let onBeforeRender = null;
 export const setBeforeRender = fn => { onBeforeRender = fn; };
+
+/* ---------------- camera preview ---------------- */
+
+/**
+ * A live inset of what a placed camera sees, drawn while you work in the
+ * Scene view.
+ *
+ * The point is to arrange a set and watch the shot at the same time:
+ * without it you have to keep switching into the camera to find out
+ * whether the thing you just nudged is even in frame.
+ *
+ * Cropped to the export aspect like the main view, and drawn with the
+ * helpers and gizmo hidden — it is a preview of the picture, not of the
+ * workspace.
+ */
+let previewItem = null;
+
+export const previewCamera = () => previewItem;
+
+export function setPreviewCamera(item){
+  previewItem = item || null;
+  return previewItem;
+}
+
+/**
+ * Inset rect in CSS pixels, top-left origin, sized to the export aspect.
+ *
+ * Positioned inside the framed picture rather than out in the letterbox:
+ * the frame guide throws a 4000px scrim over everything outside itself,
+ * so anything drawn out there is dimmed to nothing.
+ */
+function previewRect(r){
+  const a = getAspect();
+  const target = a.w / a.h;
+
+  const w = Math.max(96, Math.min(r.w * 0.28, 210));
+  const h = w / target;
+  const pad = 12;
+  return { x: r.x + r.w - w - pad, y: r.y + r.h - h - pad, w, h };
+}
+
+function renderPreview(r){
+  if (!previewItem || previewItem.obj === activeCam) return;
+  if (!previewItem.obj.visible && previewItem.helper) return;
+
+  const p = previewRect(r);
+  const cam = previewItem.obj;
+
+  const prevAspect = cam.aspect;
+  const a = getAspect();
+  cam.aspect = a.w / a.h;
+  cam.updateProjectionMatrix();
+
+  const prevHelpers = helpers.visible;
+  const prevGizmo   = gizmo.visible;
+  const prevExtra   = extraHelpers.map(h => h.visible);
+  helpers.visible = false;
+  gizmo.visible   = false;
+  extraHelpers.forEach(h => { h.visible = false; });
+
+  // The camera cannot see its own frustum lines from the inside.
+  const prevOwn = previewItem.helper?.visible;
+  if (previewItem.helper) previewItem.helper.visible = false;
+
+  const gx = p.x, gy = r.H - p.y - p.h;
+
+  // A one-pixel border, drawn as a slightly larger cleared rect behind it.
+  renderer.setViewport(gx - 1, gy - 1, p.w + 2, p.h + 2);
+  renderer.setScissor(gx - 1, gy - 1, p.w + 2, p.h + 2);
+  renderer.setScissorTest(true);
+  renderer.setClearColor(previewBorder, 1);
+  renderer.clear(true, false, false);
+
+  renderer.setViewport(gx, gy, p.w, p.h);
+  renderer.setScissor(gx, gy, p.w, p.h);
+  renderer.clearDepth();
+  renderer.render(scene, cam);
+  renderer.setScissorTest(false);
+
+  helpers.visible = prevHelpers;
+  gizmo.visible   = prevGizmo;
+  extraHelpers.forEach((h, i) => { h.visible = prevExtra[i]; });
+  if (previewItem.helper) previewItem.helper.visible = prevOwn;
+
+  cam.aspect = prevAspect;
+  cam.updateProjectionMatrix();
+}
 
 function renderFrame(){
   const r = frameRect();
@@ -321,6 +409,8 @@ function renderFrame(){
 
   renderer.render(scene, activeCam);
   renderer.setScissorTest(false);
+
+  renderPreview(r);
 }
 
 export function tick(){
