@@ -1,5 +1,5 @@
 /* ============================================================
-   export.js — render, depth, normal and mask passes.
+   export.js — render, depth, normal, mask and edge passes.
 
    The depth pass is the reason this tool exists, so it is worth saying
    what it does differently from the naive version:
@@ -19,7 +19,7 @@
 
 import * as THREE from 'three';
 
-import { scene, captureFrame, activeCamera, getAspect } from './viewport.js';
+import { scene, captureFrame, captureFramePixels, activeCamera, getAspect } from './viewport.js';
 import * as store from './store.js';
 import { download, slug, toast } from './util.js';
 
@@ -145,7 +145,7 @@ const stamp = () => new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
  * Every export goes through here. The UI turns the result into a download;
  * the MCP bridge posts it to disk so an assistant can open and inspect it.
  *
- * @param {'render'|'depth'|'normal'|'mask'} pass
+ * @param {'render'|'depth'|'normal'|'mask'|'edge'} pass
  * @returns {{dataUrl:string, filename:string, note:string, width:number, height:number}}
  */
 export function capturePass(pass, longEdge, opts = {}){
@@ -155,6 +155,7 @@ export function capturePass(pass, longEdge, opts = {}){
     case 'depth':  return { ...depthPass(width, height, opts), width, height };
     case 'normal': return { ...normalPass(width, height), width, height };
     case 'mask':   return { ...maskPass(width, height), width, height };
+    case 'edge':   return { ...edgePass(width, height, opts), width, height };
     case 'render':
     default:       return {
       dataUrl: captureFrame(width, height),
@@ -204,6 +205,177 @@ function depthPass(width, height, { subjectOnly = true, invert = false } = {}){
 export function exportDepth(longEdge, opts = {}){
   try {
     const shot = capturePass('depth', longEdge, opts);
+    download(shot.dataUrl, shot.filename);
+    toast(shot.note);
+  } catch (err){ toast(err.message, true); }
+}
+
+/* ---------------- edge pass ---------------- */
+
+/*
+ * Edges are traced from the depth and normal buffers rather than from the
+ * geometry, because geometric edge extraction (EdgesGeometry) only finds
+ * creases — a sphere has none, so the default scene would export an empty
+ * frame. A Sobel over depth catches silhouettes and every place one surface
+ * passes in front of another; a Sobel over view-space normals catches
+ * creases and the contact line where a shape meets the floor. Taking the
+ * stronger of the two gives a line drawing with no dependence on the
+ * lighting, which is what canny-style control models are trained on.
+ */
+
+const SOBEL_X = [-1, 0, 1, -2, 0, 2, -1, 0, 1];
+const SOBEL_Y = [-1, -2, -1, 0, 0, 0, 1, 2, 1];
+
+/** The largest magnitude a Sobel kernel can return from values in 0..1. */
+const SOBEL_MAX = 4 * Math.SQRT2;
+
+/** Per-pixel edge strength in 0..1, the stronger of depth and normal. */
+function edgeMagnitudes(depth, normal, w, h){
+  const out = new Float32Array(w * h);
+  const d = depth.data;
+  const n = normal.data;
+  const normDepth  = 1 / SOBEL_MAX;
+  const normNormal = 1 / (SOBEL_MAX * Math.sqrt(3));   // three channels
+
+  for (let y = 1; y < h - 1; y++){
+    for (let x = 1; x < w - 1; x++){
+      let dx = 0, dy = 0;
+      let rx = 0, ry = 0, gx = 0, gy = 0, bx = 0, by = 0;
+
+      let k = 0;
+      for (let ky = -1; ky <= 1; ky++){
+        const row = (y + ky) * w;
+        for (let kx = -1; kx <= 1; kx++, k++){
+          const wx = SOBEL_X[k];
+          const wy = SOBEL_Y[k];
+          const i = (row + x + kx) * 4;
+
+          const dv = d[i];                  // depth is greyscale
+          dx += dv * wx; dy += dv * wy;
+
+          const r = n[i], g = n[i + 1], b = n[i + 2];
+          rx += r * wx; ry += r * wy;
+          gx += g * wx; gy += g * wy;
+          bx += b * wx; by += b * wy;
+        }
+      }
+
+      const dMag = Math.sqrt(dx * dx + dy * dy) / 255 * normDepth;
+      const nMag = Math.sqrt(rx * rx + ry * ry + gx * gx + gy * gy + bx * bx + by * by)
+                   / 255 * normNormal;
+
+      out[y * w + x] = dMag > nMag ? dMag : nMag;
+    }
+  }
+  return out;
+}
+
+/** Grow a binary mask by `r` pixels, separably. */
+function dilate(src, w, h, r){
+  const tmp = new Uint8Array(w * h);
+  const out = new Uint8Array(w * h);
+
+  for (let y = 0; y < h; y++){
+    const row = y * w;
+    for (let x = 0; x < w; x++){
+      const lo = Math.max(x - r, 0), hi = Math.min(x + r, w - 1);
+      let v = 0;
+      for (let xx = lo; xx <= hi; xx++) if (src[row + xx]){ v = 1; break; }
+      tmp[row + x] = v;
+    }
+  }
+  for (let y = 0; y < h; y++){
+    const lo = Math.max(y - r, 0), hi = Math.min(y + r, h - 1);
+    for (let x = 0; x < w; x++){
+      let v = 0;
+      for (let yy = lo; yy <= hi; yy++) if (tmp[yy * w + x]){ v = 1; break; }
+      out[y * w + x] = v;
+    }
+  }
+  return out;
+}
+
+function edgePass(width, height, {
+  subjectOnly = true, sensitivity = 0.5, thickness = 1, invert = false
+} = {}){
+  const camera = activeCamera();
+
+  const pool = subjectOnly ? store.subjectMeshes() : store.visibleMeshes();
+  if (!pool.length) throw new Error('Nothing visible to trace edges from.');
+
+  const range = viewDepthRange(pool, camera);
+  if (!range) throw new Error('Could not work out a depth range.');
+
+  depthMaterial.uniforms.uNear.value   = range.near;
+  depthMaterial.uniforms.uFar.value    = range.far;
+  depthMaterial.uniforms.uInvert.value = 0;
+
+  const depth = captureFramePixels(width, height, {
+    background: new THREE.Color(0x000000),
+    overrideMaterial: depthMaterial,
+    toneMapping: THREE.NoToneMapping
+  });
+  const normal = captureFramePixels(width, height, {
+    background: new THREE.Color(0x8080ff),
+    overrideMaterial: normalMaterial,
+    toneMapping: THREE.NoToneMapping
+  });
+
+  const mag = edgeMagnitudes(depth, normal, width, height);
+
+  // Sensitivity runs the other way from the threshold it drives: turning it
+  // up should find more edges. Squared so the useful low end has more travel.
+  const s = THREE.MathUtils.clamp(sensitivity, 0, 1);
+  const threshold = 0.015 + Math.pow(1 - s, 2) * 0.36;
+
+  const lit = new Uint8Array(width * height);
+  let count = 0;
+  for (let i = 0; i < mag.length; i++){
+    if (mag[i] >= threshold){ lit[i] = 1; count++; }
+  }
+
+  const r = Math.max(0, Math.round(thickness) - 1);
+  const grown = r > 0 ? dilate(lit, width, height, r) : lit;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  const img = ctx.createImageData(width, height);
+  const px = img.data;
+
+  for (let i = 0; i < grown.length; i++){
+    const v = grown[i] ? 255 : 0;
+    const o = i * 4;
+    px[o] = px[o + 1] = px[o + 2] = invert ? 255 - v : v;
+    px[o + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+
+  const coverage = (count / (width * height)) * 100;
+  return {
+    dataUrl: canvas.toDataURL('image/png'),
+    filename: `blockout-edge-${stamp()}.png`,
+    note: `Edge map, ${invert ? 'black lines on white' : 'white lines on black'} · ` +
+          `${coverage.toFixed(1)}% of the frame is line`
+  };
+}
+
+/**
+ * Async only so the "tracing" toast gets painted first: the Sobel is a
+ * second of synchronous work at 1536 px, and a click that freezes the tab
+ * with no acknowledgement reads as a hang. capturePass itself stays
+ * synchronous — the MCP bridge depends on that.
+ *
+ * setTimeout rather than requestAnimationFrame: a hidden tab stops
+ * painting, so an rAF here would never fire and the export would hang
+ * until the tab came back to the foreground.
+ */
+export async function exportEdge(longEdge, opts = {}){
+  toast('Tracing edges…');
+  await new Promise(r => setTimeout(r, 0));
+  try {
+    const shot = capturePass('edge', longEdge, opts);
     download(shot.dataUrl, shot.filename);
     toast(shot.note);
   } catch (err){ toast(err.message, true); }

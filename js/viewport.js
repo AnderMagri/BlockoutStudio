@@ -345,10 +345,11 @@ export function pointerToNDC(clientX, clientY){
 }
 
 /**
- * Render once at an exact pixel size with helpers hidden, hand the caller a
- * data URL, then put everything back. Every image export goes through here.
+ * Render once at an exact pixel size with helpers hidden, let `harvest` read
+ * the result off the canvas, then put everything back. Every image export
+ * goes through here.
  */
-export function captureFrame(width, height, { background, overrideMaterial, toneMapping } = {}){
+function captureWith(width, height, { background, overrideMaterial, toneMapping } = {}, harvest){
   const prevSize  = new THREE.Vector2();
   renderer.getSize(prevSize);
   const prevRatio = renderer.getPixelRatio();
@@ -377,7 +378,7 @@ export function captureFrame(width, height, { background, overrideMaterial, tone
 
   renderer.clear();
   renderer.render(scene, activeCam);
-  const url = renderer.domElement.toDataURL('image/png');
+  const out = harvest(width, height);
 
   // restore
   scene.overrideMaterial = null;
@@ -392,5 +393,31 @@ export function captureFrame(width, height, { background, overrideMaterial, tone
   renderer.setSize(prevSize.x, prevSize.y, false);
   resize();
 
-  return url;
+  return out;
+}
+
+/** Render a pass and hand back a PNG data URL. */
+export function captureFrame(width, height, opts = {}){
+  return captureWith(width, height, opts, () =>
+    renderer.domElement.toDataURL('image/png'));
+}
+
+const scratch = document.createElement('canvas');
+
+/**
+ * Render a pass and hand back its raw pixels, for exports that post-process
+ * what they rendered (the edge pass runs a Sobel over depth and normals).
+ *
+ * Canvas-to-canvas drawImage is synchronous, unlike decoding a data URL
+ * through an Image — which keeps every capture path synchronous, as the MCP
+ * bridge assumes.
+ */
+export function captureFramePixels(width, height, opts = {}){
+  return captureWith(width, height, opts, (w, h) => {
+    scratch.width = w;
+    scratch.height = h;
+    const ctx = scratch.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(renderer.domElement, 0, 0, w, h);
+    return ctx.getImageData(0, 0, w, h);
+  });
 }

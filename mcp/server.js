@@ -428,11 +428,12 @@ const TOOLS = [
     description:
       'Render a pass and save it to disk, returning the file path so it can be ' +
       'opened and inspected. "depth" is the linear depth map for ControlNet-style ' +
-      'conditioning, "mask" isolates the active layer.',
+      'conditioning, "edge" is a line drawing traced from depth and normals for ' +
+      'canny-style control, "mask" isolates the active layer.',
     inputSchema: {
       type:'object',
       properties:{
-        pass:{ type:'string', enum:['render','depth','normal','mask'], default:'render' },
+        pass:{ type:'string', enum:['render','depth','normal','mask','edge'], default:'render' },
         resolution:{ type:'number', description:'Long edge in pixels, default 1536' }
       },
       additionalProperties:false

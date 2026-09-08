@@ -72,10 +72,11 @@ below that joint follows. Seven preset poses to start from.
 |---|---|
 | **Render** | The lit scene, as you see it |
 | **Depth** | Linear view-space depth, near = white |
+| **Edge** | A line drawing — white lines on black, for canny-style control |
 | **Normal** | Surface normals |
 | **Mask** | The active layer white, everything else black |
 
-All four live behind **Export…** in the top bar, along with the aspect
+All five live behind **Export…** in the top bar, along with the aspect
 ratio, output size and the setup description.
 
 Two things make the depth pass actually usable, and both are easy to get
@@ -91,6 +92,18 @@ wrong:
 
 Tone mapping is switched off for every data pass, so a white mask stays
 white and the depth ramp is not bent by ACES.
+
+The edge pass is traced from the depth and normal buffers rather than from
+the geometry. Geometric edge extraction only finds creases, and a sphere
+has none — the default scene would export an empty frame. A Sobel over
+depth catches silhouettes and anywhere one surface passes in front of
+another; a Sobel over view-space normals catches creases and the contact
+line where a shape meets the floor. Taking the stronger of the two gives
+lines that follow the geometry and ignore the lighting entirely, so the
+shadows in your render never turn into edges the model tries to draw.
+**Sensitivity** trades detail against noise and **Line thickness** sets the
+stroke width; depth and edge together hold structure harder than either
+alone.
 
 The viewport is letterboxed to the export aspect ratio: what you frame is
 exactly what you get.
@@ -290,7 +303,7 @@ js/
   store.js          scene registry, layers, selection
   layers.js         layer panel
   inspector.js      contextual panel (lens lives here)
-  export.js         render / depth / normal / mask
+  export.js         render / depth / edge / normal / mask
   prompt.js         setup → prompt text
   api.js            scene JSON in and out
   thumbnails.js     card artwork, rendered from the catalog

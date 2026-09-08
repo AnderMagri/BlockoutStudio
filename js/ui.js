@@ -24,7 +24,10 @@ import {
   FORMATS, ASPECTS, RESOLUTIONS, SHOTS,
   focalFromEquiv, depthOfField
 } from './optics.js';
-import { exportRender, exportDepth, exportNormal, exportMask, exportSize, capturePass } from './export.js';
+import {
+  exportRender, exportDepth, exportNormal, exportMask, exportEdge,
+  exportSize, capturePass
+} from './export.js';
 import { buildPrompt } from './prompt.js';
 import { renderLayers } from './layers.js';
 import { renderInspector } from './inspector.js';
@@ -247,6 +250,9 @@ function markRig(id){
 let exportRes   = 1536;
 let depthSubject = true;
 let depthInvert  = false;
+let edgeSensitivity = 0.5;
+let edgeThickness   = 1;
+let edgeInvert      = false;
 
 const longEdge = () => exportRes;
 
@@ -261,14 +267,24 @@ function buildExportControls(){
 const PASSES = [
   { id:'render', name:'Render',      note:'The lit scene as you see it',        cls:'btn-accent' },
   { id:'depth',  name:'Depth map',   note:'Linear depth, near = white' },
+  { id:'edge',   name:'Edge map',    note:'White lines on black, for canny control' },
   { id:'normal', name:'Normal map',  note:'Surface normals' },
   { id:'mask',   name:'Layer mask',  note:'Active layer white, rest black' }
 ];
 
+/** Options for whichever pass is being captured. */
+export function passOptions(id){
+  return id === 'edge'
+    ? { subjectOnly:depthSubject, sensitivity:edgeSensitivity,
+        thickness:edgeThickness, invert:edgeInvert }
+    : { subjectOnly:depthSubject, invert:depthInvert };
+}
+
 function runPass(id){
   switch (id){
     case 'render': exportRender(longEdge()); break;
-    case 'depth':  exportDepth(longEdge(), { subjectOnly:depthSubject, invert:depthInvert }); break;
+    case 'depth':  exportDepth(longEdge(), passOptions('depth')); break;
+    case 'edge':   exportEdge(longEdge(), passOptions('edge')); break;
     case 'normal': exportNormal(longEdge()); break;
     case 'mask':   exportMask(longEdge()); break;
   }
@@ -336,8 +352,59 @@ function openExportModal(){
       mk('Fit range to subject', depthSubject, v => { depthSubject = v; });
       mk('Invert (near = black)', depthInvert,  v => { depthInvert = v; });
       opts.appendChild(el('p', 'caption',
-        'Default is near = white, the convention Krea and ControlNet depth expect.'));
+        'Default is near = white, the convention Krea and ControlNet depth expect. ' +
+        '"Fit range to subject" applies to the edge pass too.'));
       body.appendChild(opts);
+
+      /* ---- edge options ---- */
+      const edgeOpts = el('details', 'opts');
+      edgeOpts.appendChild(el('summary', null, 'Edge options'));
+
+      // The .field row plus a full-width range is the same shape the
+      // inspector's sliders use; a range inside .switch would inherit the
+      // iOS-toggle styling meant for checkboxes.
+      const range = (label, { min, max, step, value, format, onInput }) => {
+        const row = el('div', 'field');
+        row.appendChild(el('label', null, label));
+        const out = el('span', 'val', format(value));
+        row.appendChild(out);
+
+        const input = el('input');
+        input.type = 'range';
+        input.min = min; input.max = max; input.step = step; input.value = value;
+        input.setAttribute('aria-label', label);
+        input.oninput = () => {
+          const v = +input.value;
+          out.textContent = format(v);
+          onInput(v);
+        };
+        edgeOpts.append(row, input);
+      };
+
+      range('Sensitivity', {
+        min:0, max:1, step:0.02, value:edgeSensitivity,
+        format: v => `${Math.round(v * 100)}%`,
+        onInput: v => { edgeSensitivity = v; }
+      });
+      range('Line thickness', {
+        min:1, max:5, step:1, value:edgeThickness,
+        format: v => `${v} px`,
+        onInput: v => { edgeThickness = v; }
+      });
+
+      const inv = el('label', 'switch');
+      inv.appendChild(document.createTextNode('Invert (black on white)'));
+      const invBox = el('input');
+      invBox.type = 'checkbox';
+      invBox.checked = edgeInvert;
+      invBox.onchange = () => { edgeInvert = invBox.checked; };
+      inv.appendChild(invBox);
+      edgeOpts.appendChild(inv);
+
+      edgeOpts.appendChild(el('p', 'caption',
+        'Traced from depth and normals, so lines follow the geometry and ignore ' +
+        'the lighting. Stack it with the depth pass for the tightest structural hold.'));
+      body.appendChild(edgeOpts);
 
       /* ---- text outputs ---- */
       const row = el('div', 'grid-2');
@@ -740,11 +807,9 @@ const apiHooks = {
     });
   },
 
-  /** Render a pass with the panel's current depth options applied. */
+  /** Render a pass with the panel's current options for that pass applied. */
   capturePass(pass, resolution){
-    return capturePass(pass, resolution || exportRes, {
-      subjectOnly: depthSubject, invert: depthInvert
-    });
+    return capturePass(pass, resolution || exportRes, passOptions(pass));
   },
   afterBuild(){ frameSubject(activeCamera()); syncReadout(); },
   newScene(){ return resetToDefaultScene(); },
