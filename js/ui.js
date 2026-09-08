@@ -9,7 +9,7 @@
 
 import * as store from './store.js';
 import {
-  renderer, activeCamera, isFreeCamera, freeCamera,
+  renderer, activeCamera, isFreeCamera, freeCamera, gizmo,
   setAspect, getAspect, resize
 } from './viewport.js';
 import {
@@ -49,6 +49,17 @@ export function currentParams(){
 }
 
 export const currentFormat = () => FORMATS[currentParams().formatId] || FORMATS.ff;
+
+/**
+ * Push sceneParams onto the free camera, so the Scene view renders with the
+ * same optics every readout and prompt describes.
+ */
+function applyFreeCameraParams(){
+  const format = FORMATS[sceneParams.formatId] || FORMATS.ff;
+  freeCamera.filmGauge = format.gauge;
+  freeCamera.setFocalLength(focalFromEquiv(sceneParams.equiv, format));
+  freeCamera.updateProjectionMatrix();
+}
 
 let currentRig  = rigById('three-point');
 let currentShot = null;
@@ -392,6 +403,9 @@ function openModal({ title, subtitle, build, wide = false }){
     document.removeEventListener('keydown', onKey);
     backdrop.remove();
   };
+  // closeAnyModal must be able to run this cleanup too — removing only the
+  // backdrop node would orphan the Escape listener.
+  backdrop.closeModal = close;
 
   sheet.appendChild(el('h1', null, title));
   if (subtitle) sheet.appendChild(el('p', 'sheet-sub', subtitle));
@@ -415,7 +429,10 @@ function openModal({ title, subtitle, build, wide = false }){
 
 /** Dismiss whatever sheet is open, if any. */
 function closeAnyModal(){
-  for (const node of document.querySelectorAll('.sheet-backdrop')) node.remove();
+  for (const node of document.querySelectorAll('.sheet-backdrop')){
+    if (node.closeModal) node.closeModal();
+    else node.remove();
+  }
 }
 
 async function copyText(text){
@@ -594,10 +611,11 @@ function openScenesPanel(){
       const imp = el('button', null, 'Import file…');
       imp.onclick = async () => {
         try {
-          const { scene, name } = await sceneFromFile();
+          const picked = await sceneFromFile();
+          if (!picked) return;                   // the picker was cancelled
           close();
-          await api.applyScene(scene);
-          toast(`Opened “${name}”`);
+          await api.applyScene(picked.scene);
+          toast(`Opened “${picked.name}”`);
         } catch (err){ toast(err.message, true); }
       };
       const exp = el('button', null, 'Download current');
@@ -637,10 +655,16 @@ function buildInput(){
   });
 
   window.addEventListener('keydown', e => {
-    if (e.target.matches('input, textarea, select')) return;
+    if (!(e.target instanceof Element) || e.target.matches('input, textarea, select')) return;
     if (e.metaKey || e.ctrlKey) return;
+    // With a sheet open, focus can sit on a button — X would silently delete
+    // the selection behind the modal. The modal's own Escape handler closes it.
+    if (document.querySelector('.sheet-backdrop')) return;
 
     switch (e.key.toLowerCase()){
+      case 'w': gizmo.setMode('translate'); break;
+      case 'e': gizmo.setMode('rotate'); break;
+      case 'r': gizmo.setMode('scale'); break;
       case 'd': duplicateSelected(); break;
       case 'x': destroySelected(); break;
       // F frames what you have selected, or the whole scene when nothing is.
@@ -674,6 +698,7 @@ const apiHooks = {
     if (spec.focus  != null) p.focus = +spec.focus;
     if (spec.format && FORMATS[spec.format]) p.formatId = spec.format;
     if (item) applyCameraParams(item);
+    else applyFreeCameraParams();
 
     syncReadout();
   },
@@ -687,7 +712,9 @@ const apiHooks = {
     }
     syncReadout();
   },
-  setRig(rig){ currentRig = rig; markRig(rig.id); },
+  // rig may be null: a scene with explicit fixtures, or one deliberately
+  // unlit, matches no preset — claiming the last one would be a lie.
+  setRig(rig){ currentRig = rig ?? null; markRig(rig?.id ?? null); },
 
   /** applyScene can choose the set and the working light. */
   setStage(spec){
@@ -735,6 +762,12 @@ const apiHooks = {
 
 /** Move the active camera to a framing preset, then fit the subject. */
 export function applyShot(shot){
+  const item = activeCameraItem();
+  if (item?.params.locked){
+    toast('This camera is locked — unlock it to apply a framing preset.');
+    return;
+  }
+
   const cam = activeCamera();
   const p = currentParams();
   p.equiv = shot.equiv;
@@ -742,8 +775,8 @@ export function applyShot(shot){
   cam.position.set(...shot.pos);
   cam.lookAt(...shot.target);
 
-  const item = activeCameraItem();
   if (item) applyCameraParams(item);
+  else applyFreeCameraParams();
 
   currentShot = shot;
   frameSubject(cam);
@@ -811,6 +844,7 @@ export function initUI(){
   store.on('names',  () => { renderLayers(); renderViewSeg(); });
 
   installGlobalAPI(apiHooks);
+  applyFreeCameraParams();
 
   renderLayers();
   renderInspector(true);

@@ -18,7 +18,8 @@ const KEY_AUTOSAVE = 'blockout.autosave';
 /** localStorage throws in private windows and when storage is full. */
 function readStore(){
   try {
-    return JSON.parse(localStorage.getItem(KEY_SCENES) || '{}');
+    const parsed = JSON.parse(localStorage.getItem(KEY_SCENES) || '{}');
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
   } catch {
     return {};
   }
@@ -38,6 +39,8 @@ function writeStore(all){
 export function listScenes(){
   const all = readStore();
   return Object.entries(all)
+    // One hand-edited or corrupt entry must not take the whole panel down.
+    .filter(([, entry]) => entry && typeof entry === 'object')
     .map(([name, entry]) => ({
       name,
       savedAt: entry.savedAt,
@@ -122,12 +125,14 @@ export function sceneToFile(scene, name){
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/** Open a file picker and resolve with the parsed scene. */
+/** Open a file picker and resolve with the parsed scene, or null on cancel. */
 export function sceneFromFile(){
   return new Promise((resolve, reject) => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'application/json,.json';
+    // Without this, cancelling the picker leaves the promise pending forever.
+    input.oncancel = () => resolve(null);
     input.onchange = async () => {
       const file = input.files?.[0];
       if (!file) return reject(new Error('No file chosen.'));

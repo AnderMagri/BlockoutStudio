@@ -140,7 +140,11 @@ helpers.add(grid);
 /** The free-roaming viewport camera. Placed cameras are separate objects. */
 export const freeCamera = new THREE.PerspectiveCamera(35, 1, 0.01, 100);
 freeCamera.filmGauge = 36;
-freeCamera.setFocalLength(85);
+// Must agree with ui.js's sceneParams: every readout, DoF figure and prompt
+// for the Scene view is computed from those params, and a mismatch means the
+// prose says 50 mm while the picture is something else. ui.js re-applies
+// this whenever sceneParams change.
+freeCamera.setFocalLength(50);
 freeCamera.position.set(0.34, 0.15, 0.34);
 
 let activeCam = freeCamera;
@@ -224,7 +228,16 @@ export function resize(){
   syncFrameGuide(r);
 
   const a = getAspect();
-  activeCam.aspect = a.w / a.h;
+  const ratio = a.w / a.h;
+  if (activeCam.aspect !== ratio){
+    // three derives fov from filmGauge and aspect at setFocalLength time, so
+    // changing the aspect alone silently changes what the lens means: 85 mm
+    // set at 4:5 renders like ~53 mm after a switch to 16:9. Re-anchor the
+    // focal length across the change so a lens keeps meaning the same lens.
+    const focal = activeCam.getFocalLength();
+    activeCam.aspect = ratio;
+    activeCam.setFocalLength(focal);
+  }
   activeCam.updateProjectionMatrix();
 }
 

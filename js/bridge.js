@@ -14,10 +14,18 @@
 import { toast } from './util.js';
 
 /* The server that serves this page is the one to talk to; the fallback
-   covers running the site from python -m http.server on another port. */
-const ORIGIN = location.port === '8787'
-  ? location.origin
-  : 'http://localhost:8787';
+   covers running the site from python -m http.server on another port.
+   Probed rather than matched against a hardcoded port, because the MCP
+   server honours BLOCKOUT_PORT and may be serving this page from anywhere. */
+let ORIGIN = location.origin;
+
+async function resolveOrigin(){
+  try {
+    const res = await fetch(`${location.origin}/studio/health`, { cache:'no-store' });
+    if (res.ok) return location.origin;
+  } catch { /* not the MCP server — fall through */ }
+  return 'http://localhost:8787';
+}
 
 let source = null;
 let connected = false;
@@ -121,8 +129,10 @@ async function runCommand({ id, method, params }){
 }
 
 /** Open the event stream. EventSource retries on its own, so this runs once. */
-export function connectBridge(){
+export async function connectBridge(){
   if (source) return;
+
+  ORIGIN = await resolveOrigin();
 
   try {
     source = new EventSource(`${ORIGIN}/studio/events`);

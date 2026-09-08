@@ -11,7 +11,7 @@ import * as store from './store.js';
 import {
   scene, helpers, extraHelpers, gizmo, orbit,
   ground, backdrop, cyclorama, freeCamera, activeCamera, setActiveCamera,
-  pointerToNDC, focusOrbitOn
+  pointerToNDC, focusOrbitOn, getAspect
 } from './viewport.js';
 import { makeCatalogObject, labelFor, catalogItem } from './catalog.js';
 import { makeMannequin, buildJointHandles, highlightJointHandle, applyPose, poseById } from './figure.js';
@@ -207,11 +207,17 @@ export async function updateTextObject(item){
   refreshOutline();
 }
 
-export function addSplineObject(){
-  const spline = makeSpline();
+export function addSplineObject(params = {}){
+  const spline = makeSpline(params);
   scene.add(spline.group);
   placeBeside(spline.group);
-  helpers.add(spline.handles);
+
+  // Handles must live inside the group: the tube is built from handle
+  // positions in group space, so a handle parented anywhere else renders
+  // displaced from the curve the moment the group is moved. Registered in
+  // extraHelpers so exports still hide them.
+  spline.group.add(spline.handles);
+  extraHelpers.push(spline.handles);
 
   const item = store.addItem({
     name: store.nextName('Spline'), kind:'mesh', sub:'spline', obj:spline.group
@@ -236,7 +242,11 @@ export function addCameraObject(params = {}){
   };
   const format = FORMATS[p.formatId];
 
-  const cam = new THREE.PerspectiveCamera(35, 4 / 5, 0.01, 100);
+  // Created at the current frame aspect: three derives the field of view
+  // from filmGauge and aspect at setFocalLength time, so a camera built at
+  // a hardcoded aspect means "85 mm" at a different fov than the viewport's.
+  const a = getAspect();
+  const cam = new THREE.PerspectiveCamera(35, a.w / a.h, 0.01, 100);
   cam.filmGauge = format.gauge;
   cam.setFocalLength(focalFromEquiv(p.equiv, format));
 
@@ -493,8 +503,11 @@ export function destroyItem(item){
   if (store.state.selected === item) select(null);
 
   if (item.spline){
-    helpers.remove(item.spline.handles);
-    disposeObject3D(item.spline.handles);
+    const i = extraHelpers.indexOf(item.spline.handles);
+    if (i >= 0) extraHelpers.splice(i, 1);
+    // Detached before the dispose below: handles share one geometry and
+    // material across every spline, which must outlive this one.
+    item.obj.remove(item.spline.handles);
   }
   if (item.handles){
     for (const h of item.handles){
@@ -514,6 +527,10 @@ export function destroyItem(item){
   }
   if (item.lightTarget) scene.remove(item.lightTarget);
 
+  // Light.dispose frees the shadow map render target; without it every rig
+  // switch leaks a 1024² depth texture per shadow-casting fixture.
+  if (item.kind === 'light') item.obj.dispose?.();
+
   scene.remove(item.obj);
   disposeObject3D(item.obj);
   store.removeItem(item);
@@ -525,6 +542,9 @@ export function destroySelected(){
   if (!item) return;
   if (item.locked){ toast('Set pieces cannot be deleted — hide the Set layer instead.'); return; }
   destroyItem(item);
+  // Shadow frustums sized for a deleted mannequin give a lone bottle soft,
+  // blocky contact shadows — refit them to what is left.
+  fitShadowCameras();
   store.applyVisibility();
   store.changed();
 }
@@ -582,7 +602,8 @@ export function duplicateSelected(){
     spline.group.rotation.copy(item.obj.rotation);
     spline.group.scale.copy(item.obj.scale);
     scene.add(spline.group);
-    helpers.add(spline.handles);
+    spline.group.add(spline.handles);
+    extraHelpers.push(spline.handles);
 
     const copy = store.addItem({
       name: store.nextName(baseName), kind:'mesh', sub:'spline',
@@ -629,9 +650,12 @@ gizmo.addEventListener('objectChange', () => {
   if (activeHandle && item.spline){
     rebuildSpline(item.spline);
   } else if (item.kind === 'light'){
-    // Dragging a light invalidates its spherical params — recompute them.
+    // Dragging a light invalidates its spherical params — recompute them,
+    // then push them back through: intensity follows dist² and an area
+    // light re-aims, so skipping this leaves the light rendering with the
+    // pre-drag values until the next slider touch snaps it.
     Object.assign(item.params, unplace(item.obj.position));
-    item.helper?.update?.();
+    updateLight(item);
     store.changed();
   } else if (item.kind === 'camera'){
     item.helper?.update();
@@ -798,6 +822,12 @@ const _fitBox = new THREE.Box3();
  * for a 12 cm jar crops the top off a 20 cm bottle.
  */
 export function frameSubject(camera, margin = 1.22){
+  // A locked camera holds its framing against every path that moves one —
+  // the gizmo and orbit are disabled elsewhere, but F and "Fit to subject"
+  // land here.
+  const owner = store.itemsOfKind('camera').find(c => c.obj === camera);
+  if (owner?.params.locked) return false;
+
   const items = store.subjectMeshes();
   if (!items.length) return false;
 

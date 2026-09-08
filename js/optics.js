@@ -70,9 +70,17 @@ export const focalFromEquiv = (equiv, format) => equiv * format.gauge / 36;
 /** Real focal length on this format → full-frame equivalent. */
 export const equivFromFocal = (focal, format) => focal * 36 / format.gauge;
 
-/** Horizontal field of view in degrees. */
-export const hFov = (focal, format) =>
-  2 * Math.atan(format.gauge / (2 * focal)) * 180 / Math.PI;
+/**
+ * Horizontal field of view in degrees.
+ *
+ * three treats filmGauge as the frame's long edge: in portrait aspects the
+ * horizontal dimension is gauge·aspect, not the full gauge — using the full
+ * width overstated the h-fov of every portrait frame.
+ */
+export const hFov = (focal, format, aspect = 3 / 2) => {
+  const width = format.gauge * Math.min(aspect, 1);
+  return 2 * Math.atan(width / (2 * focal)) * 180 / Math.PI;
+};
 
 /* ---------------- depth of field ---------------- */
 

@@ -37,7 +37,7 @@ import * as THREE from 'three';
 import * as store from './store.js';
 import {
   addFromCatalog, addMannequinObject, setPose, applyRig, addCameraObject,
-  applyCameraParams, updateLight,
+  addLightObject, addSplineObject,
   destroyItem, select, frameSubject, updateTextObject, fitShadowCameras
 } from './objects.js';
 import { CATEGORIES, catalogItem } from './catalog.js';
@@ -86,8 +86,11 @@ export async function applyScene(scene, { replace = true, hooks = {} } = {}){
   // Does this scene say anything about lighting? If not, the lights that
   // are already up are left alone — clearing them would hand back a black
   // stage to anyone who only meant to swap the objects.
+  // A `lighting` block with `rig: null` means "deliberately unlit" — that is
+  // how a scene whose lights were all deleted serializes, and it must not
+  // reload with the old rig quietly rebuilt.
   const definesLights   = (scene.objects || []).some(o => o.id === 'light');
-  const definesLighting = definesLights || !!scene.lighting?.rig;
+  const definesLighting = definesLights || (scene.lighting != null && 'rig' in scene.lighting);
 
   if (replace){
     for (const item of [...store.state.items]){
@@ -110,18 +113,27 @@ export async function applyScene(scene, { replace = true, hooks = {} } = {}){
     const previousActive = store.state.activeLayerId;
     if (layer) store.state.activeLayerId = layer.id;
 
-    const item = await (spec.id === 'mannequin' ? addMannequinObject() : addFromCatalog(spec.id));
+    // Cameras, lights and splines carry settings that shape the object as it
+    // is built — a light's type decides which THREE class is constructed, so
+    // assigning params after the fact would leave an area light living in a
+    // SpotLight. Build them from their spec directly.
+    let item;
+    if (spec.id === 'light'){
+      item = addLightObject({ ...(spec.light || {}) }, layer?.id ?? null);
+    } else if (spec.id === 'camera'){
+      item = addCameraObject({ ...(spec.camera || {}) });
+      if (layer) item.layerId = layer.id;
+    } else if (spec.id === 'spline' && spec.spline){
+      item = addSplineObject({
+        ...spec.spline,
+        points: Array.isArray(spec.spline.points) && spec.spline.points.length >= 2
+          ? spec.spline.points.map(p => new THREE.Vector3(...vec(p)))
+          : undefined
+      });
+    } else {
+      item = await (spec.id === 'mannequin' ? addMannequinObject() : addFromCatalog(spec.id));
+    }
     store.state.activeLayerId = previousActive;
-
-    // Cameras and lights carry settings, not just a transform.
-    if (item && spec.id === 'camera' && spec.camera){
-      Object.assign(item.params, spec.camera);
-      applyCameraParams(item);
-    }
-    if (item && spec.id === 'light' && spec.light){
-      Object.assign(item.params, spec.light);
-      updateLight(item);
-    }
 
     if (!item){ warnings.push(`Could not build "${spec.id}"`); continue; }
     added++;
@@ -155,9 +167,27 @@ export async function applyScene(scene, { replace = true, hooks = {} } = {}){
       await updateTextObject(item);
     }
 
-    if (spec.id === 'mannequin' && spec.pose){
-      if (POSES.some(p => p.id === spec.pose)) setPose(item, spec.pose);
-      else warnings.push(`Unknown pose: "${spec.pose}"`);
+    if (spec.id === 'mannequin'){
+      if (spec.pose){
+        if (POSES.some(p => p.id === spec.pose)) setPose(item, spec.pose);
+        else warnings.push(`Unknown pose: "${spec.pose}"`);
+      }
+      // Hand-posed joints, saved on top of the preset they started from.
+      if (spec.joints && item.joints){
+        for (const [name, rot] of Object.entries(spec.joints)){
+          const [jx, jy, jz] = vec(rot);
+          item.joints.get(name)?.rotation.set(
+            THREE.MathUtils.degToRad(jx),
+            THREE.MathUtils.degToRad(jy),
+            THREE.MathUtils.degToRad(jz)
+          );
+        }
+        item.obj.updateMatrixWorld(true);
+      }
+      // setPose re-seats the figure on the floor, which tramples an explicit
+      // position (a mannequin saved sitting on a box would snap to y=0) —
+      // the saved position was captured after flooring, so it wins.
+      if (spec.position) item.obj.position.set(px, py, pz);
     }
   }
 
@@ -168,6 +198,9 @@ export async function applyScene(scene, { replace = true, hooks = {} } = {}){
     const rig = applyRig(scene.lighting.rig);
     if (!rig) warnings.push(`Unknown lighting rig: "${scene.lighting.rig}"`);
     else hooks.setRig?.(rig);
+  } else if (definesLighting){
+    // Explicit fixtures or a cleared rig: no preset describes this lighting.
+    hooks.setRig?.(null);
   }
 
   // There is always a camera.
@@ -229,13 +262,33 @@ export function serializeScene(cameraState = {}){
         const p = item.obj.userData.textParams;
         spec.text = p.text; spec.size = p.size; spec.depth = p.depth;
       }
-      if (item.sub === 'mannequin') spec.pose = item.params?.pose;
+      if (item.sub === 'mannequin'){
+        spec.pose = item.params?.pose;
+        // The preset is a starting point; hand-posed joints are the work.
+        if (item.joints){
+          spec.joints = {};
+          for (const [name, node] of item.joints){
+            spec.joints[name] = [deg(node.rotation.x), deg(node.rotation.y), deg(node.rotation.z)];
+          }
+        }
+      }
+      if (item.sub === 'spline' && item.spline){
+        const p = item.spline.params;
+        spec.spline = {
+          radius: p.radius, tension: p.tension, closed: p.closed,
+          points: p.points.map(v => [round(v.x), round(v.y), round(v.z)])
+        };
+      }
       return spec;
     });
 
+  // No light objects means deliberately unlit — the last rig id would only
+  // resurrect fixtures the user deleted.
+  const hasLights = store.state.items.some(i => i.kind === 'light');
+
   return {
     objects,
-    lighting: { rig: cameraState.rigId ?? null },
+    lighting: { rig: hasLights ? cameraState.rigId ?? null : null },
     camera: {
       lens:   cameraState.equiv,
       fstop:  cameraState.fstop,

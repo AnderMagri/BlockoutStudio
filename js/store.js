@@ -144,13 +144,17 @@ export const subjectMeshes = () =>
 
 /** Every mesh currently visible, subject and set alike. */
 export const visibleMeshes = () =>
-  state.items.filter(i => i.kind === 'mesh' && i.obj.visible);
+  state.items.filter(i => (i.kind === 'mesh' || i.kind === 'set') && i.obj.visible);
 
 /** Unique name within its kind: "Box 3", "Camera 2"… */
 export function nextName(base){
+  // The base comes from user-editable names, so it must be matched
+  // literally — duplicating an object renamed "C++" is not a regex error.
+  const literal = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`^${literal} (\\d+)$`);
   let n = 0;
   for (const item of state.items){
-    const m = item.name.match(new RegExp(`^${base} (\\d+)$`));
+    const m = item.name.match(pattern);
     if (m) n = Math.max(n, +m[1]);
   }
   return `${base} ${n + 1}`;

@@ -15,7 +15,7 @@ import {
   applyCameraParams, lookThrough, refreshOutline, setPose, frameSubject,
   setCameraLock, measureItem, resizeItem, restOnGround
 } from './objects.js';
-import { gizmo, activeCamera, renderer } from './viewport.js';
+import { gizmo, activeCamera, renderer, getAspect } from './viewport.js';
 import { rebuildSpline, addControlPoint, removeControlPoint } from './spline.js';
 import { POSES } from './figure.js';
 import {
@@ -198,9 +198,14 @@ function dimensionControls(host, item){
     input.setAttribute('aria-label', { x:'Width', y:'Height', z:'Depth' }[axis]);
 
     const commit = () => {
+      const current = measureItem(item)[axis];
+      // An untouched field still holds the unit-rounded display string, and
+      // committing that would silently resize to the rounding error.
+      if (input.value.trim() === unitValue(current)) return;
+
       const metresWanted = parseLength(input.value);
       if (metresWanted == null || metresWanted <= 0){
-        input.value = unitValue(measureItem(item)[axis]);   // reject, restore
+        input.value = unitValue(current);                   // reject, restore
         return;
       }
       resizeItem(item, axis, metresWanted, keepProportions);
@@ -346,7 +351,7 @@ function cameraControls(host, item){
     const dof = depthOfField(focalReal, p.fstop, p.focus, fmt);
     dofBox.innerHTML =
       `<b>${mm(dof.total)}</b> in focus · ${mm(dof.front)} front / ${mm(dof.back)} back<br>` +
-      `real focal <b>${focalReal.toFixed(0)} mm</b> · h-fov ${hFov(focalReal, fmt).toFixed(0)}°<br>` +
+      `real focal <b>${focalReal.toFixed(0)} mm</b> · h-fov ${hFov(focalReal, fmt, getAspect().w / getAspect().h).toFixed(0)}°<br>` +
       `hyperfocal ${mm(dof.hyperfocal)}`;
     syncFromUI();
   };
@@ -356,9 +361,13 @@ function cameraControls(host, item){
     format: v => `${Math.round(v)} mm`,
     onInput: v => { p.equiv = v; applyCameraParams(item); refreshDof(); }
   });
+  // The f-stop may have been set to a value off the ladder (via the scene
+  // API); the nearest step is honest, where indexOf's -1 showed f/1.4.
+  const fstopIndex = FSTOPS.reduce(
+    (best, f, i) => Math.abs(f - p.fstop) < Math.abs(FSTOPS[best] - p.fstop) ? i : best, 0);
   slider(host, 'Aperture', {
     min:0, max:FSTOPS.length - 1, step:1,
-    value: Math.max(0, FSTOPS.indexOf(p.fstop)),
+    value: fstopIndex,
     format: i => `f/${FSTOPS[i]}`,
     onInput: i => { p.fstop = FSTOPS[i]; refreshDof(); }
   });
