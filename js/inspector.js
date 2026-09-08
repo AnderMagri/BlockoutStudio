@@ -13,7 +13,8 @@ import * as store from './store.js';
 import {
   duplicateSelected, destroySelected, updateLight, updateTextObject,
   applyCameraParams, lookThrough, refreshOutline, setPose, frameSubject,
-  setCameraLock, measureItem, resizeItem, restOnGround, centreSelection
+  setCameraLock, measureItem, resizeItem, restOnGround,
+  centreSelection, centreSubject
 } from './objects.js';
 import { gizmo, activeCamera, renderer, getAspect } from './viewport.js';
 import { rebuildSpline, addControlPoint, removeControlPoint } from './spline.js';
@@ -462,8 +463,17 @@ function cameraControls(host, item){
     () => false,
     s => applyShotFromInspector(s, item));
 
-  const fit = button(host, 'Fit to subject', () => frameSubject(activeCamera()), 'btn-quiet');
+  // Centres without moving the camera. Fitting also chose a distance, which
+  // threw away a viewpoint you had just placed by hand.
+  const centre = button(host, 'Centre subject', () => centreSubject(), 'btn-quiet');
+  centre.style.marginTop = '2px';
+  centre.title = 'Turn this camera to put the subject in the middle of the frame, ' +
+                 'keeping its position (C)';
+
+  const fit = button(host, 'Fit distance to subject',
+    () => frameSubject(activeCamera()), 'btn-quiet');
   fit.style.marginTop = '2px';
+  fit.title = 'Also pull the camera back until the whole subject fits — this moves it';
 
   host.appendChild(el('p', 'caption',
     'Move and aim this camera with the gizmo like any other object.'));

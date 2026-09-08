@@ -44,10 +44,14 @@ set from *framing* through a camera, and a camera can be locked — the
 locked camera shows a padlock in the view switcher.
 
 **◱ Preview** in the top bar puts a live inset of what the camera sees in
-the corner of the Scene view, so you can arrange the set and judge the
+the corner of the **Scene view**, so you can arrange the set and judge the
 shot at the same time instead of switching back and forth to find out
 whether what you just nudged is even in frame. It shows the selected
 camera, or the first one, and never appears in an export.
+
+The studio opens *looking through* a camera, where an inset of that same
+camera would be pointless — so nothing shows until you switch to Arrange.
+The button dims and reads "scene view" while that is the case.
 
 Focal lengths are full-frame equivalents and the real focal
 length is derived from the sensor format you choose, so "85 mm" looks like
@@ -379,13 +383,20 @@ mcp/
 camera · `F` frame the selection (or the whole scene when nothing is
 selected) · `D` duplicate · `X` delete · `Esc` deselect
 
-`C` and `F` are different tools. `F` chooses a *distance* — it pulls the
-camera back until the subject fits, which changes the shot. `C` only
-turns the camera, so a viewpoint and a lens you already settled on
-survive; it just puts the subject in the middle of the frame. Once a
-camera is roughly placed, `C` is almost always the one you want.
+`C` and `F` are different tools, and the difference is whether the camera
+moves. `C` only *turns* it, so a viewpoint and a lens you already settled
+on survive — it just puts the subject in the middle of the frame. `F`
+also chooses a *distance*, pulling the camera back until everything fits,
+which changes the shot. Once a camera is roughly placed by hand, `C` is
+almost always the one you want.
 
-Neither will move a camera whose framing is locked.
+The camera panel has both: **Centre subject** turns it, **Fit distance to
+subject** also moves it. Neither will touch a camera whose framing is
+locked.
+
+`C` with nothing selected — or with a camera selected, which is what you
+do to change its lens — centres the whole subject rather than doing
+nothing.
 
 **⊙ Orbit** in the top bar switches the centre of rotation between
 whatever you have selected and the scene as a whole. Selecting something

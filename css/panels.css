@@ -271,6 +271,14 @@
 }
 .pill-btn:hover{ background:var(--fill) }
 
+/* On, and doing something right now. */
+.pill-btn.on{ color:var(--accent) }
+
+/* On, but not applicable in the current view — the camera preview while you
+   are already looking through the camera. Dimmed so it does not read as
+   broken when nothing appears. */
+.pill-btn.muted{ color:var(--label-3) }
+
 /* ---------------- modal body ---------------- */
 
 /* A sheet whose height follows its content rather than a fixed textarea. */

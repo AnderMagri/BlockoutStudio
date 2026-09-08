@@ -815,19 +815,13 @@ export function focusSelection(opts = {}){
 }
 
 /**
- * Point the camera at the selected object, keeping its position.
+ * Turn the active camera to look at a point, without moving it.
  *
- * Distinct from framing it: framing also chooses a distance, which moves
- * the camera and changes the shot. This only turns it, so a lens and a
- * viewpoint you settled on survive — it just puts the subject in the
- * middle of the frame. That is the usual thing you want once a camera is
- * roughly placed and the product is off to one side.
+ * The distinction from framing matters: framing also chooses a distance,
+ * which moves the camera and changes the shot. This only turns it, so a
+ * viewpoint and a lens you settled on survive.
  */
-export function centreSelection(){
-  const item = store.state.selected;
-  if (!item){ toast('Select something to centre first.'); return false; }
-
-  const point = centerOf(item);
+function aimAt(point){
   if (!point) return false;
 
   const cam = activeCamera();
@@ -847,6 +841,32 @@ export function centreSelection(){
   refreshOutline();
   store.changed();
   return true;
+}
+
+/** Centre every subject shape in frame, keeping the camera where it is. */
+export function centreSubject(){
+  const items = store.subjectMeshes();
+  if (!items.length){ toast('Nothing in the scene to centre on.'); return false; }
+
+  _centerBox.makeEmpty();
+  for (const item of items) _centerBox.expandByObject(item.obj);
+  if (_centerBox.isEmpty()) return false;
+
+  return aimAt(_centerBox.getCenter(new THREE.Vector3()));
+}
+
+/**
+ * Centre the selection in frame, keeping the camera where it is.
+ *
+ * Falls back to centring the whole subject when the selection is not
+ * something you can point a camera at. Selecting a camera is exactly what
+ * you do to change its lens, and aiming a camera at its own position is
+ * degenerate — it used to fling the view somewhere meaningless.
+ */
+export function centreSelection(){
+  const item = store.state.selected;
+  if (!item || item.kind === 'camera' || item.locked) return centreSubject();
+  return aimAt(centerOf(item));
 }
 
 /** Pivot back on the scene as a whole. */

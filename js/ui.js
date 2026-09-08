@@ -679,9 +679,21 @@ let previewOn = true;
 function renderPreviewBtn(){
   const b = $('previewBtn');
   if (!b) return;
-  b.textContent = previewOn ? '◱ Preview' : '◱ Preview off';
+
+  // The studio opens looking through a camera, where an inset of that same
+  // camera would be pointless — so the button has to say why nothing is
+  // showing, or it just reads as broken.
+  const inCameraView = !isFreeCamera();
+
+  b.textContent = !previewOn ? '◱ Preview off'
+                : inCameraView ? '◱ Preview · scene view'
+                : '◱ Preview';
+  b.title = inCameraView
+    ? 'You are looking through the camera — the preview appears in the Scene view'
+    : 'Show a live inset of what the camera sees while you arrange';
   b.setAttribute('aria-pressed', previewOn ? 'true' : 'false');
-  b.classList.toggle('on', previewOn);
+  b.classList.toggle('on', previewOn && !inCameraView);
+  b.classList.toggle('muted', previewOn && inCameraView);
 }
 
 /**
@@ -690,6 +702,7 @@ function renderPreviewBtn(){
  * looking through a camera — the main view is the preview then.
  */
 function syncPreview(){
+  renderPreviewBtn();
   if (!previewOn || !isFreeCamera()){ setPreviewCamera(null); return; }
   const sel = store.state.selected;
   const cam = sel?.kind === 'camera' ? sel : store.itemsOfKind('camera')[0];
