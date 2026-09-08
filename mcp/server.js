@@ -56,6 +56,15 @@ const activePage = () => pages[pages.length - 1] || null;
 function dropPage(res){
   const i = pages.indexOf(res);
   if (i >= 0) pages.splice(i, 1);
+
+  // Commands addressed to this page will never be answered — fail them now
+  // rather than letting the caller sit out the full timeout.
+  for (const [id, entry] of pending){
+    if (entry.page !== res) continue;
+    clearTimeout(entry.timer);
+    pending.delete(id);
+    entry.reject(new Error('The studio page disconnected before answering.'));
+  }
 }
 
 function sendToPage(payload){
@@ -89,7 +98,7 @@ function callPage(method, params = {}, timeoutMs = 20000){
       reject(new Error(`The studio did not answer "${method}" within ${timeoutMs}ms.`));
     }, timeoutMs);
 
-    pending.set(id, { resolve, reject, timer });
+    pending.set(id, { resolve, reject, timer, page: activePage() });
     if (!sendToPage({ id, method, params })){
       clearTimeout(timer);
       pending.delete(id);
@@ -117,11 +126,25 @@ const MIME = {
   '.png':'image/png', '.svg':'image/svg+xml', '.ico':'image/x-icon'
 };
 
-const cors = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'content-type',
-  'Access-Control-Allow-Methods': 'GET,POST,OPTIONS'
-};
+/**
+ * CORS, restricted to local origins. A wildcard here would let any website
+ * the user visits open the SSE command channel, post forged results and
+ * upload files — the server binds to 127.0.0.1, but the user's browser is
+ * a bridge any page can cross. Only the studio itself (same origin, or a
+ * localhost dev server on another port) has any business calling in.
+ */
+const LOCAL_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+
+function corsFor(req){
+  const origin = req.headers.origin;
+  if (!origin || !LOCAL_ORIGIN.test(origin)) return {};
+  return {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Headers': 'content-type',
+    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+    'Vary': 'Origin'
+  };
+}
 
 function readBody(req, limitBytes = 64 * 1024 * 1024){
   return new Promise((resolve, reject) => {
@@ -139,6 +162,7 @@ function readBody(req, limitBytes = 64 * 1024 * 1024){
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
+  const cors = corsFor(req);
 
   if (req.method === 'OPTIONS'){ res.writeHead(204, cors); return res.end(); }
 
@@ -183,8 +207,11 @@ const server = http.createServer(async (req, res) => {
   /* ---- the page handing over rendered pixels ---- */
   if (url.pathname === '/studio/upload' && req.method === 'POST'){
     try {
+      // Only PNGs may land here: EXPORT_DIR sits inside the served tree, so
+      // an uploaded .html would otherwise be served back on this origin.
       const name = (url.searchParams.get('name') || 'export.png')
-        .replace(/[^a-zA-Z0-9._-]/g, '_');
+        .replace(/[^a-zA-Z0-9._-]/g, '_')
+        .replace(/(\.png)?$/i, '.png');
       fs.mkdirSync(EXPORT_DIR, { recursive: true });
       const file = path.join(EXPORT_DIR, name);
       fs.writeFileSync(file, await readBody(req));
@@ -206,12 +233,22 @@ const server = http.createServer(async (req, res) => {
   }
 
   /* ---- static site ---- */
-  let rel = decodeURIComponent(url.pathname);
+  let rel;
+  try {
+    rel = decodeURIComponent(url.pathname);
+  } catch {
+    // Malformed percent-encoding. Uncaught, this URIError would reject the
+    // async handler and take the whole process down.
+    res.writeHead(400, cors); return res.end('Bad request');
+  }
   if (rel === '/') rel = '/index.html';
   const file = path.join(ROOT, rel);
 
-  // Refuse anything that escapes the project folder.
-  if (!file.startsWith(ROOT)){ res.writeHead(403, cors); return res.end('Forbidden'); }
+  // Refuse anything that escapes the project folder. The separator matters:
+  // a bare prefix check also passes sibling folders like "BlockoutStudioX".
+  if (file !== ROOT && !file.startsWith(ROOT + path.sep)){
+    res.writeHead(403, cors); return res.end('Forbidden');
+  }
 
   fs.readFile(file, (err, data) => {
     if (err){ res.writeHead(404, cors); return res.end('Not found'); }
@@ -286,17 +323,41 @@ const TOOLS = [
               position:{ type:'array', items:{ type:'number' }, minItems:3, maxItems:3 },
               rotation:{ type:'array', items:{ type:'number' }, minItems:3, maxItems:3,
                          description:'Euler angles in degrees' },
-              scale:{ type:'number' },
+              scale:{ oneOf:[ { type:'number' },
+                              { type:'array', items:{ type:'number' }, minItems:3, maxItems:3 } ] },
               layer:{ type:'string', description:'Layer name; created if absent' },
               text:{ type:'string', description:'For the "text" object' },
               size:{ type:'number', description:'Cap height in metres, for "text"' },
-              pose:{ type:'string', description:'For "mannequin"; see get_vocabulary' }
+              depth:{ type:'number', description:'Extrusion depth in metres, for "text"' },
+              pose:{ type:'string', description:'For "mannequin"; see get_vocabulary' },
+              joints:{ type:'object', description:'For "mannequin": per-joint Euler rotations in degrees, as get_scene emits them',
+                       additionalProperties:{ type:'array', items:{ type:'number' }, minItems:3, maxItems:3 } },
+              spline:{ type:'object', description:'For "spline": control points and tube settings, as get_scene emits them',
+                       properties:{
+                         points:{ type:'array', items:{ type:'array', items:{ type:'number' }, minItems:3, maxItems:3 } },
+                         radius:{ type:'number' }, tension:{ type:'number' }, closed:{ type:'boolean' }
+                       }, additionalProperties:false },
+              camera:{ type:'object', description:'For "camera": lens settings, as get_scene emits them',
+                       properties:{
+                         formatId:{ type:'string' }, equiv:{ type:'number' }, fstop:{ type:'number' },
+                         focus:{ type:'number' }, locked:{ type:'boolean' }
+                       }, additionalProperties:false },
+              light:{ type:'object', description:'For "light": fixture settings, as get_scene emits them',
+                      properties:{
+                        type:{ type:'string', enum:['spot','area','sun','point','ambient'] },
+                        az:{ type:'number' }, el:{ type:'number' }, dist:{ type:'number' },
+                        power:{ type:'number' }, kelvin:{ type:'number' }, softness:{ type:'number' },
+                        size:{ type:'number' }, angle:{ type:'number' }
+                      }, additionalProperties:false }
             },
             required:['id'],
             additionalProperties:false
           }
         },
-        lighting:{ type:'object', properties:{ rig:{ type:'string' } }, additionalProperties:false },
+        lighting:{ type:'object',
+                   properties:{ rig:{ type:['string','null'],
+                                      description:'Rig id, or null to clear all lights' } },
+                   additionalProperties:false },
         camera:{
           type:'object',
           properties:{
