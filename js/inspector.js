@@ -23,6 +23,7 @@ import {
   focalFromEquiv, depthOfField, hFov
 } from './optics.js';
 import { LIGHT_TYPES } from './lights.js';
+import { ROLE_LIST, roleById, attachRef, detachRef } from './references.js';
 import { $, el, fillSelect, metres, mm, kelvinName } from './util.js';
 import { UNIT_LIST, unit, setUnit, value as unitValue, parse as parseLength } from './units.js';
 
@@ -170,7 +171,67 @@ function meshControls(host, item){
   if (item.sub === 'spline')    splineControls(host, item);
   if (item.sub === 'mannequin') mannequinControls(host, item);
   dimensionControls(host, item);
+  standInControls(host, item);
   transformControls(host, item);
+}
+
+/**
+ * Declare what this grey shape stands in for.
+ *
+ * No file is involved — the artwork and product photos go straight to
+ * the image tool. What the studio contributes is knowing which shape
+ * each one belongs to, so the generated instruction can say so and the
+ * model puts the right thing in the right place.
+ */
+function standInControls(host, item){
+  section(host, 'Stands in for');
+
+  const list = el('div', 'scene-list');
+  host.appendChild(list);
+
+  const repaint = () => {
+    list.innerHTML = '';
+    if (!item.refs?.length){
+      list.appendChild(el('p', 'caption',
+        'Nothing declared. Grey shapes are described only by their form.'));
+      return;
+    }
+    item.refs.forEach((ref, i) => {
+      const row = el('div', 'scene-row');
+      const text = el('span', 'scene-text');
+      text.appendChild(el('span', 'scene-name', roleById(ref.role).label));
+      text.appendChild(el('span', 'scene-meta', ref.describe || 'no description'));
+      row.appendChild(text);
+
+      const del = el('button', 'tiny btn-danger', '×');
+      del.title = 'Remove';
+      del.onclick = () => { detachRef(item, i); repaint(); };
+      row.append(del);
+      list.appendChild(row);
+    });
+  };
+  repaint();
+
+  const role = el('select');
+  fillSelect(role, ROLE_LIST.map(r => ({ value:r.id, label:r.label })), 'product');
+
+  const what = el('input');
+  what.type = 'text';
+  what.placeholder = 'What is it? e.g. an iPhone 15 Pro';
+  what.setAttribute('aria-label', 'What this shape stands in for');
+
+  const add = el('button', 'btn-quiet', 'Declare');
+  add.onclick = () => {
+    attachRef(item, { role: role.value, describe: what.value });
+    what.value = '';
+    repaint();
+  };
+  what.onkeydown = e => { if (e.key === 'Enter') add.click(); };
+
+  host.append(role, what, add);
+  host.appendChild(el('p', 'caption',
+    'Named in the prompt under Export → Image brief, with this object’s ' +
+    'position in frame so the model knows which shape you mean.'));
 }
 
 /**

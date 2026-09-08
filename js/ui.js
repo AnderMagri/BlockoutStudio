@@ -255,6 +255,12 @@ let edgeSensitivity = 0.5;
 let edgeThickness   = 1;
 let edgeInvert      = false;
 
+/* Which passes the image brief tells you to attach. Depth earns its place
+   by default; the edge map is a second structural cue worth stacking when
+   silhouettes matter. */
+let briefDepth = true;
+let briefEdge  = false;
+
 const longEdge = () => exportRes;
 
 function buildExportControls(){
@@ -407,7 +413,31 @@ function openExportModal(){
         'the lighting. Stack it with the depth pass for the tightest structural hold.'));
       body.appendChild(edgeOpts);
 
+      /* ---- what the brief asks for ---- */
+      const briefOpts = el('details', 'opts');
+      briefOpts.appendChild(el('summary', null, 'Image brief'));
+      const mkBrief = (label, checked, onChange) => {
+        const l = el('label', 'switch');
+        l.appendChild(document.createTextNode(label));
+        const cb = el('input'); cb.type = 'checkbox'; cb.checked = checked;
+        cb.onchange = () => onChange(cb.checked);
+        l.appendChild(cb);
+        briefOpts.appendChild(l);
+      };
+      mkBrief('Include the depth pass', briefDepth, v => { briefDepth = v; });
+      mkBrief('Include the edge pass',  briefEdge,  v => { briefEdge = v; });
+      briefOpts.appendChild(el('p', 'caption',
+        'Declare what a shape stands in for by selecting it — the brief names ' +
+        'it and says where it sits in frame.'));
+      body.appendChild(briefOpts);
+
       /* ---- text outputs ---- */
+      const brief = el('button', 'btn-accent', 'Image brief…');
+      brief.style.marginTop = '2px';
+      brief.title = 'The numbered image list and instruction to paste into an image tool';
+      brief.onclick = () => { close(); openBriefSheet(); };
+      body.appendChild(brief);
+
       const row = el('div', 'grid-2');
       const a = el('button', null, 'Describe setup…');
       a.onclick = () => { close(); openPromptSheet(); };
@@ -506,6 +536,61 @@ function closeAnyModal(){
 async function copyText(text){
   try { await navigator.clipboard.writeText(text); toast('Copied to clipboard'); }
   catch { toast('Press ⌘C to copy', true); }
+}
+
+/**
+ * The brief: a numbered list of the images to attach and an instruction
+ * that ties each one to its object.
+ *
+ * Written for a model that is handed several images at once, which is how
+ * the manual workflow actually goes — export the passes, drop them and
+ * your product shots into the image tool, paste this. The numbering is
+ * the wiring diagram: attach the images in the order listed.
+ */
+function openBriefSheet(){
+  const intent = el('input');
+  intent.type = 'text';
+  intent.placeholder = 'What do you want? e.g. an iPhone in a bucket of ice';
+
+  const manifest = buildManifest({ includeDepth: briefDepth, includeEdge: briefEdge });
+  const text = buildGenerationPrompt(promptContext(), manifest, '');
+
+  const attachList = manifest
+    .map((e, i) => `${i + 1}. ${e.kind === 'pass'
+      ? `${e.pass} pass — export it from this panel`
+      : `${e.label} — your own file`}`)
+    .join('\n');
+
+  const sheet = openSheet({
+    title: 'Image brief',
+    subtitle: `Attach ${manifest.length} image${manifest.length === 1 ? '' : 's'} ` +
+              'in this order, then paste the text below.',
+    value: text,
+    actions: [
+      { label:'Copy', cls:'btn-accent', run:(ta) => copyText(ta.value) }
+    ]
+  });
+
+  // The wiring order, as a real list — a <p> collapses the newlines.
+  const order = el('div', 'readout');
+  order.style.whiteSpace = 'pre-line';
+  order.textContent = attachList;
+
+  const ta = sheet.textarea;
+  // Retyping the intent should rewrite the brief, since it opens the text.
+  intent.oninput = () => {
+    ta.value = buildGenerationPrompt(
+      promptContext(),
+      buildManifest({ includeDepth: briefDepth, includeEdge: briefEdge }),
+      intent.value
+    );
+    ta.scrollTop = 0;
+  };
+
+  ta.parentNode.insertBefore(order, ta);
+  ta.parentNode.insertBefore(intent, ta);
+  ta.scrollTop = 0;
+  intent.focus();
 }
 
 function openPromptSheet(){

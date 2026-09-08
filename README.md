@@ -38,8 +38,18 @@ shape it represents.
 
 **Cameras are objects.** Drop one in, move it with the gizmo, select it to
 set the lens. The view switcher at the top left separates *arranging* the
-set from *framing* through a camera, and a camera can be locked so a stray
-drag cannot move a framing you were happy with. Focal lengths are full-frame equivalents and the real focal
+set from *framing* through a camera, and a camera can be locked — the
+**Lock framing** switch at the top of its inspector — so a stray drag,
+`F`, `C` or a framing preset cannot move a shot you were happy with. A
+locked camera shows a padlock in the view switcher.
+
+**◱ Preview** in the top bar puts a live inset of what the camera sees in
+the corner of the Scene view, so you can arrange the set and judge the
+shot at the same time instead of switching back and forth to find out
+whether what you just nudged is even in frame. It shows the selected
+camera, or the first one, and never appears in an export.
+
+Focal lengths are full-frame equivalents and the real focal
 length is derived from the sensor format you choose, so "85 mm" looks like
 85 mm on APS-C too. Depth of field is computed from the actual optics —
 hyperfocal distance, near and far limits, and a circle of confusion that
@@ -107,6 +117,53 @@ alone.
 
 The viewport is letterboxed to the export aspect ratio: what you frame is
 exactly what you get.
+
+---
+
+## Labels, covers and real products
+
+The scene stays grey clay. That is the point: the geometry tells an image
+model the composition, the camera and the light, and surface detail would
+only mislead the data passes.
+
+But a real product has a label, a cover, a screen, and often you have a
+photograph of the thing itself. Those files go straight to the image tool —
+the studio never holds them. What the studio contributes is knowing *which
+grey shape each one belongs to*.
+
+Select a shape and the **Stands in for** block lets you declare it: pick a
+role (the product itself, label artwork, screen content, cover art) and say
+what it is in a few words. Nothing is rendered; the declaration only shapes
+the text.
+
+**Export… → Image brief** then writes the instruction. It numbers every
+image you should attach, in order, and ties each one to its object:
+
+```
+Image 1 is a grey clay blockout of the composition. Match its camera angle,
+perspective, object placement, proportions and lighting direction exactly.
+The grey material is a placeholder for layout only — do not reproduce the
+grey clay look in the final image.
+Image 2 is a linear depth map of the same scene…
+Image 3 is the product that replaces the cylinder ("Ice bucket") at centre,
+below centre, about a third of the frame height. It is a brushed steel ice
+bucket.
+Image 4 is the product that replaces the box ("Phone") at centre, above
+centre, about a third of the frame height. It is an iPhone 15 Pro.
+```
+
+Two details in there are doing real work. Multi-image models take an array
+of images with no mask field and no region selection — nothing in the
+request says which grey box is the phone, so the model infers it from the
+prompt. The studio can be accurate about that because it projects each
+declared object through the live camera and describes where it actually
+lands in the frame; a phrase typed by hand is wrong the moment the camera
+moves. And the line about the grey being a placeholder is not decoration:
+without it the model faithfully returns grey clay.
+
+So the workflow is: block out the shot, declare what the shapes are, export
+the render and the depth pass, then drop those plus your own product files
+into the image tool in the order the brief lists and paste the brief.
 
 ---
 
@@ -304,7 +361,8 @@ js/
   layers.js         layer panel
   inspector.js      contextual panel (lens lives here)
   export.js         render / depth / edge / normal / mask
-  prompt.js         setup → prompt text
+  references.js     what each grey shape stands in for
+  prompt.js         setup → prompt text, and the numbered image brief
   api.js            scene JSON in and out
   thumbnails.js     card artwork, rendered from the catalog
   bridge.js         talks to the MCP server
@@ -317,9 +375,17 @@ mcp/
 
 ## Keyboard
 
-`W` move · `E` rotate · `R` scale · `F` frame the selection (or the whole
-scene when nothing is selected) · `D` duplicate · `X` delete · `Esc`
-deselect
+`W` move · `E` rotate · `R` scale · `C` centre the selection in the
+camera · `F` frame the selection (or the whole scene when nothing is
+selected) · `D` duplicate · `X` delete · `Esc` deselect
+
+`C` and `F` are different tools. `F` chooses a *distance* — it pulls the
+camera back until the subject fits, which changes the shot. `C` only
+turns the camera, so a viewpoint and a lens you already settled on
+survive; it just puts the subject in the middle of the frame. Once a
+camera is roughly placed, `C` is almost always the one you want.
+
+Neither will move a camera whose framing is locked.
 
 **⊙ Orbit** in the top bar switches the centre of rotation between
 whatever you have selected and the scene as a whole. Selecting something
