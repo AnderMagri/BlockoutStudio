@@ -26,6 +26,20 @@
   box-shadow:0 0 0 1px rgba(255,255,255,.16), 0 0 0 4000px rgba(6,6,6,.64);
 }
 
+/* Names the camera the preview inset is showing. Positioned from
+   viewport.js, which is the only place that knows the inset's rect. */
+#previewLabel{
+  position:absolute;
+  font-family:var(--mono); font-size:9px;
+  text-transform:uppercase; letter-spacing:.07em;
+  color:#fff;
+  background:rgba(191,90,242,.92);
+  padding:2px 6px;
+  border-radius:4px 4px 0 0;
+  white-space:nowrap;
+  pointer-events:none;
+}
+
 /* ---------------- panel material ---------------- */
 
 .panel{

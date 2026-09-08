@@ -313,3 +313,48 @@ input.dim-input{
   text-align:right;
 }
 input.dim-input:focus{ outline:2px solid var(--accent); outline-offset:-1px }
+
+/* ---------------- help ---------------- */
+
+.help-steps{
+  list-style:none; counter-reset:step;
+  display:flex; flex-direction:column; gap:11px;
+  margin:0; padding:0;
+}
+.help-steps li{
+  counter-increment:step;
+  display:grid; grid-template-columns:20px 1fr;
+  gap:2px 9px; align-items:baseline;
+}
+.help-steps li::before{
+  content:counter(step);
+  grid-row:1 / span 2;
+  font-family:var(--mono); font-size:10px;
+  color:var(--accent);
+  background:rgba(191,90,242,.14);
+  border-radius:5px;
+  padding:2px 0; text-align:center;
+}
+.help-step-title{ font-size:12px; font-weight:590; color:var(--label) }
+.help-step-body{ font-size:11.5px; line-height:1.55; color:var(--label-2) }
+
+.help-note{
+  display:flex; flex-direction:column; gap:1px;
+  padding:8px 10px;
+  background:var(--fill);
+  border-radius:8px;
+}
+.help-note-title{ font-size:11.5px; font-weight:590; color:var(--label) }
+.help-note-body{ font-size:11.5px; line-height:1.55; color:var(--label-2) }
+
+.help-keys{ display:flex; flex-direction:column; gap:4px; margin-bottom:4px }
+.help-key{ display:grid; grid-template-columns:64px 1fr; gap:9px; align-items:baseline }
+.help-key span{ font-size:11.5px; line-height:1.5; color:var(--label-2) }
+.help-key kbd{
+  font-family:var(--mono); font-size:10px;
+  color:var(--label);
+  background:var(--fill);
+  border-radius:5px;
+  padding:3px 0; text-align:center;
+  box-shadow:inset 0 -1px 0 rgba(0,0,0,.3);
+}

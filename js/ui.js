@@ -36,6 +36,8 @@ import { installGlobalAPI } from './api.js';
 import {
   listScenes, loadScene, deleteScene, sceneToFile, sceneFromFile, readAutosave
 } from './scenes.js';
+import { bridgeState, bridgeDetail, onBridgeState, toggleBridge } from './bridge.js';
+import { HELP_KEYS, HELP_PANELS, HELP_WORKFLOW } from './help.js';
 import { $, el, fillSelect, toast } from './util.js';
 
 /* ---------------- shared camera state ---------------- */
@@ -666,6 +668,38 @@ function buildPivotToggle(){
   renderPivotBtn();
 }
 
+/* ---------------- MCP ---------------- */
+
+/**
+ * An off switch and a light for the assistant connection.
+ *
+ * The dot in the brand pill has always shown this, but a 6px dot is not a
+ * control and barely a signal — you cannot tell "no server running" from
+ * "switched off", and there was no way to stop a page taking commands.
+ */
+function renderMcpBtn(){
+  const b = $('mcpBtn');
+  if (!b) return;
+
+  const state = bridgeState();
+  const mark = state === 'on' ? '⦿' : state === 'connecting' ? '◌' : '○';
+  b.textContent = `${mark} MCP`;
+  b.title = bridgeDetail();
+  b.setAttribute('aria-pressed', state === 'on' ? 'true' : 'false');
+  b.classList.toggle('on', state === 'on');
+  b.classList.toggle('muted', state === 'connecting');
+}
+
+function buildMcpToggle(){
+  $('mcpBtn').onclick = () => {
+    const wasOff = bridgeState() === 'off';
+    toggleBridge();
+    toast(wasOff ? 'Looking for the MCP server…' : 'MCP off');
+  };
+  onBridgeState(renderMcpBtn);
+  renderMcpBtn();
+}
+
 /* ---------------- camera preview ---------------- */
 
 /**
@@ -717,6 +751,63 @@ function buildPreviewToggle(){
     toast(previewOn ? 'Camera preview on' : 'Camera preview off');
   };
   renderPreviewBtn();
+}
+
+/* ---------------- help ---------------- */
+
+function openHelpPanel(){
+  openModal({
+    title: 'Help',
+    subtitle: 'Commands, the controls worth explaining, and the whole workflow ' +
+              'from an empty stage to a generated image.',
+    wide: true,
+    build(body){
+      /* ---- workflow ---- */
+      body.appendChild(el('h2', null, 'How to shoot something'));
+      body.appendChild(el('p', 'caption', HELP_WORKFLOW.intro));
+
+      const steps = el('ol', 'help-steps');
+      HELP_WORKFLOW.steps.forEach(([title, text]) => {
+        const li = el('li');
+        li.appendChild(el('span', 'help-step-title', title));
+        li.appendChild(el('span', 'help-step-body', text));
+        steps.appendChild(li);
+      });
+      body.appendChild(steps);
+
+      /* ---- gotchas ---- */
+      body.appendChild(el('h2', null, 'Worth knowing'));
+      for (const [title, text] of HELP_WORKFLOW.notes){
+        const note = el('div', 'help-note');
+        note.appendChild(el('span', 'help-note-title', title));
+        note.appendChild(el('span', 'help-note-body', text));
+        body.appendChild(note);
+      }
+
+      /* ---- keys ---- */
+      body.appendChild(el('h2', null, 'Keyboard'));
+      for (const { group, keys } of HELP_KEYS){
+        body.appendChild(el('p', 'caption', group));
+        const rows = el('div', 'help-keys');
+        for (const [key, what] of keys){
+          const row = el('div', 'help-key');
+          row.appendChild(el('kbd', null, key));
+          row.appendChild(el('span', null, what));
+          rows.appendChild(row);
+        }
+        body.appendChild(rows);
+      }
+
+      /* ---- controls ---- */
+      body.appendChild(el('h2', null, 'The controls'));
+      for (const [name, text] of HELP_PANELS){
+        const row = el('div', 'help-note');
+        row.appendChild(el('span', 'help-note-title', name));
+        row.appendChild(el('span', 'help-note-body', text));
+        body.appendChild(row);
+      }
+    }
+  });
 }
 
 /* ---------------- scenes ---------------- */
@@ -1061,6 +1152,8 @@ export function initUI(){
     resetToDefaultScene();
     toast('New scene');
   };
+  $('helpBtn').onclick = openHelpPanel;
+  buildMcpToggle();
   buildPivotToggle();
   buildPreviewToggle();
   buildSetControl();

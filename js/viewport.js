@@ -324,6 +324,7 @@ export const previewCamera = () => previewItem;
 
 export function setPreviewCamera(item){
   previewItem = item || null;
+  if (!previewItem) hidePreviewLabel();
   return previewItem;
 }
 
@@ -344,12 +345,42 @@ function previewRect(r){
   return { x: r.x + r.w - w - pad, y: r.y + r.h - h - pad, w, h };
 }
 
+/**
+ * Name the camera the inset is showing.
+ *
+ * A DOM label rather than something drawn in WebGL: text in a render pass
+ * would mean a font atlas for one caption. It sits in #viewOverlay, and
+ * only this file knows where the inset actually is.
+ */
+let labelState = '';
+
+function syncPreviewLabel(p, name){
+  const label = $('previewLabel');
+  if (!label) return;
+
+  const key = `${name}|${Math.round(p.x)}|${Math.round(p.y)}`;
+  if (key === labelState) return;      // don't touch the DOM every frame
+  labelState = key;
+
+  label.hidden = false;
+  label.textContent = name;
+  label.style.left = `${Math.round(p.x)}px`;
+  // Sits on top of the inset's border, like a tab.
+  label.style.top  = `${Math.round(p.y) - 15}px`;
+}
+
+function hidePreviewLabel(){
+  const label = $('previewLabel');
+  if (label && !label.hidden){ label.hidden = true; labelState = ''; }
+}
+
 function renderPreview(r){
-  if (!previewItem || previewItem.obj === activeCam) return;
-  if (!previewItem.obj.visible && previewItem.helper) return;
+  if (!previewItem || previewItem.obj === activeCam){ hidePreviewLabel(); return; }
+  if (!previewItem.obj.visible && previewItem.helper){ hidePreviewLabel(); return; }
 
   const p = previewRect(r);
   const cam = previewItem.obj;
+  syncPreviewLabel(p, previewItem.name);
 
   const prevAspect = cam.aspect;
   const a = getAspect();

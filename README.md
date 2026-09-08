@@ -46,8 +46,9 @@ locked camera shows a padlock in the view switcher.
 **◱ Preview** in the top bar puts a live inset of what the camera sees in
 the corner of the **Scene view**, so you can arrange the set and judge the
 shot at the same time instead of switching back and forth to find out
-whether what you just nudged is even in frame. It shows the selected
-camera, or the first one, and never appears in an export.
+whether what you just nudged is even in frame. It is labelled with the
+camera it is showing, follows the selected camera (or the first one), and
+never appears in an export.
 
 The studio opens *looking through* a camera, where an inset of that same
 camera would be pointless — so nothing shows until you switch to Arrange.
@@ -270,8 +271,13 @@ For Claude Desktop, add this to `claude_desktop_config.json`:
 }
 ```
 
-Then open <http://localhost:8787> and leave the tab open. The dot in the
-top-left pill turns purple when the studio and the assistant are talking.
+Then open <http://localhost:8787> and leave the tab open. **⦿ MCP** in the
+top bar is the switch and the light: purple and filled when a server is
+connected and can drive the scene, a hollow ring when you have switched it
+off, and a dotted ring while it is looking for a server (`EventSource`
+retries by itself, so leaving it dotted and starting the server later just
+works). Clicking it off stops this page taking commands without touching
+the server. The dot in the brand pill follows the same state.
 
 You can also run the server by hand — it serves the site either way:
 
@@ -366,6 +372,7 @@ js/
   inspector.js      contextual panel (lens lives here)
   export.js         render / depth / edge / normal / mask
   references.js     what each grey shape stands in for
+  help.js           the in-app help copy
   prompt.js         setup → prompt text, and the numbered image brief
   api.js            scene JSON in and out
   thumbnails.js     card artwork, rendered from the catalog
@@ -374,6 +381,18 @@ js/
 mcp/
   server.js         MCP server + static host, zero dependencies
 ```
+
+---
+
+## Help, in the studio
+
+**Help** in the top bar has all of the below — the commands, the controls
+that are not obvious from their label, and the whole workflow from an
+empty stage to a generated image, step by step. It exists because nobody
+reads a README with their hands on the tool.
+
+`js/help.js` holds that copy and nothing else, so editing it needs no
+knowledge of the panel that shows it.
 
 ---
 

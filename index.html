@@ -24,7 +24,10 @@
 <div id="stage">
 
   <main id="viewport">
-    <div id="viewOverlay"><div id="frameGuide"></div></div>
+    <div id="viewOverlay">
+      <div id="frameGuide"></div>
+      <div id="previewLabel" hidden></div>
+    </div>
   </main>
 
   <!-- ============ top left: identity + view ============ -->
@@ -53,6 +56,10 @@
     <div class="pill">
       <label class="sr-only" for="aspect">Aspect ratio</label>
       <select id="aspect" title="Framing and export aspect ratio"></select>
+    </div>
+    <div class="pill tight">
+      <button class="pill-btn" id="mcpBtn"></button>
+      <button class="pill-btn" id="helpBtn" title="Commands and how to take a shot to Krea">Help</button>
     </div>
     <div class="pill tight">
       <button class="pill-btn" id="newBtn" title="Start over with the default scene">New</button>

@@ -28,16 +28,39 @@ async function resolveOrigin(){
 }
 
 let source = null;
-let connected = false;
+
+/**
+ * 'off'        — not connected and not trying (the user switched it off)
+ * 'connecting' — the stream is open or retrying; EventSource retries by
+ *                itself, so this is also the state after a failure
+ * 'on'         — the server answered and commands can arrive
+ */
+let state = 'off';
+let detail = 'Not connected';
+
+const watchers = new Set();
+
+export const bridgeState  = () => state;
+export const bridgeDetail = () => detail;
+
+/** Tell the UI when the connection changes. Returns an unsubscribe. */
+export function onBridgeState(fn){
+  watchers.add(fn);
+  return () => watchers.delete(fn);
+}
 
 /* ---------------- status light ---------------- */
 
-function setStatus(on, title){
-  connected = on;
+function setStatus(next, title){
+  state = next;
+  detail = title;
+
   const dot = document.querySelector('.pill .dot');
-  if (!dot) return;
-  dot.style.background = on ? 'var(--accent)' : 'rgba(122,122,122,.5)';
-  dot.title = title;
+  if (dot){
+    dot.style.background = next === 'on' ? 'var(--accent)' : 'rgba(122,122,122,.5)';
+    dot.title = title;
+  }
+  for (const fn of watchers) fn(state, detail);
 }
 
 /* ---------------- command handlers ---------------- */
@@ -132,18 +155,23 @@ async function runCommand({ id, method, params }){
 export async function connectBridge(){
   if (source) return;
 
+  setStatus('connecting', 'Looking for the MCP server…');
   ORIGIN = await resolveOrigin();
+
+  // A disconnect that landed while the origin was being probed wins.
+  if (state === 'off') return;
 
   try {
     source = new EventSource(`${ORIGIN}/studio/events`);
   } catch (err){
     console.warn('[bridge] could not open the event stream:', err);
+    setStatus('off', 'Could not open the event stream');
     return;
   }
 
   source.onopen = () => {
-    const first = !connected;
-    setStatus(true, 'Connected to the MCP server — an assistant can drive this scene');
+    const first = state !== 'on';
+    setStatus('on', 'Connected to the MCP server — an assistant can drive this scene');
     if (first) toast('Assistant connected');
   };
 
@@ -155,9 +183,27 @@ export async function connectBridge(){
   };
 
   source.onerror = () => {
-    // Fires on every retry too, so this must stay quiet and cheap.
-    setStatus(false, `Not connected — run: node mcp/server.js`);
+    // Fires on every retry too, so this must stay quiet and cheap. It is
+    // still "connecting" rather than "off": EventSource keeps trying, and
+    // the server appearing later should just work.
+    setStatus('connecting', 'No MCP server yet — run: node mcp/server.js');
   };
+}
 
-  setStatus(false, 'Connecting…');
+/**
+ * Stop listening. The server keeps running; this page simply stops taking
+ * commands from it, which is the point of an off switch.
+ */
+export function disconnectBridge(){
+  if (source){
+    source.close();
+    source = null;
+  }
+  setStatus('off', 'MCP off — this page is not taking commands');
+}
+
+export function toggleBridge(){
+  if (state === 'off') connectBridge();
+  else disconnectBridge();
+  return state;
 }
