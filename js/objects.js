@@ -340,6 +340,13 @@ export function applyRig(rigId){
 
 /* ---------------- selection ---------------- */
 
+/**
+ * Is this something the view should centre on? Geometry you are arranging,
+ * yes. Lights, cameras and locked set dressing, no — they are not what the
+ * shot is about, and they are either far away or enormous.
+ */
+const pivotable = item => item?.kind === 'mesh' && !item.locked;
+
 export function select(item, handleMesh = null){
   // Leaving an object with handles puts them away.
   const prev = store.state.selected;
@@ -363,7 +370,11 @@ export function select(item, handleMesh = null){
   // layer, the next primitive you added would silently land there too.
   // The active layer is changed by clicking a layer header, nothing else.
 
-  if (orbitAroundSelection){
+  // Only real geometry moves the pivot. A light sits a metre off the set, a
+  // camera sits behind you and the ground is 40 m across — pivoting on any of
+  // them throws the view somewhere unrelated to the thing you are arranging,
+  // and clicking a backdrop to check it should not cost you your framing.
+  if (orbitAroundSelection && pivotable(item)){
     // Pivot on what was just picked, without swinging the view around.
     const point = handleMesh ? handleMesh.getWorldPosition(new THREE.Vector3()) : centerOf(item);
     if (point) focusOrbitOn(point, { keepFraming: true });
@@ -385,9 +396,10 @@ export function select(item, handleMesh = null){
     // A joint only ever rotates — translating one would tear the figure apart.
     gizmo.attach(handleMesh.userData.joint.node);
     gizmo.setMode('rotate');
-  } else if (lockedCamera || viewingSelf){
-    // Nothing to grab: a locked camera must not move, and a camera you are
-    // looking through would put its own gizmo across the whole frame.
+  } else if (lockedCamera || viewingSelf || item.locked){
+    // Nothing to grab: a locked camera must not move, a camera you are
+    // looking through would put its own gizmo across the whole frame, and
+    // dragging the floor or the backdrop out of place cannot be undone.
     gizmo.detach();
   } else {
     gizmo.attach(handleMesh || item.obj);
@@ -398,7 +410,9 @@ export function select(item, handleMesh = null){
 
 export function refreshOutline(){
   const item = store.state.selected;
-  if (!item || item.kind === 'light' || !item.obj.visible){
+  // No outline on lights (no geometry to bound) or on locked set pieces —
+  // a box around a 40 m floor plane is just lines across the whole view.
+  if (!item || item.kind === 'light' || item.locked || !item.obj.visible){
     outline.visible = false;
     return;
   }
@@ -792,9 +806,47 @@ export function centerOf(item){
 
 /** Pivot on the current selection. Silently does nothing with none. */
 export function focusSelection(opts = {}){
-  const point = centerOf(store.state.selected);
+  const item = store.state.selected;
+  // Locked set dressing is 40 m across; framing it fills the view with floor.
+  if (!item || item.locked) return false;
+  const point = centerOf(item);
   if (point) focusOrbitOn(point, opts);
   return !!point;
+}
+
+/**
+ * Point the camera at the selected object, keeping its position.
+ *
+ * Distinct from framing it: framing also chooses a distance, which moves
+ * the camera and changes the shot. This only turns it, so a lens and a
+ * viewpoint you settled on survive — it just puts the subject in the
+ * middle of the frame. That is the usual thing you want once a camera is
+ * roughly placed and the product is off to one side.
+ */
+export function centreSelection(){
+  const item = store.state.selected;
+  if (!item){ toast('Select something to centre first.'); return false; }
+
+  const point = centerOf(item);
+  if (!point) return false;
+
+  const cam = activeCamera();
+  const owner = store.itemsOfKind('camera').find(c => c.obj === cam);
+  if (owner?.params.locked){
+    toast('This camera is locked — unlock it to re-aim.', true);
+    return false;
+  }
+
+  cam.lookAt(point);
+  // Orbiting reads the target, so without this the next drag would swing
+  // straight back to whatever it was pointed at before.
+  orbit.target.copy(point);
+  orbit.update();
+
+  owner?.helper?.update();
+  refreshOutline();
+  store.changed();
+  return true;
 }
 
 /** Pivot back on the scene as a whole. */

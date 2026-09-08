@@ -8,7 +8,7 @@
 
 import * as store from './store.js';
 import { destroyItem, select } from './objects.js';
-import { $, el } from './util.js';
+import { $, el, toast } from './util.js';
 
 const ICONS = {
   camera:'▣', light:'✦', set:'▤',
@@ -77,12 +77,19 @@ function renderLayer(layer){
 
   head.append(eye, solo, name, count);
 
-  if (store.state.layers.length > 1){
+  // The Set layer holds locked pieces and must not be deletable: there is
+  // nothing that could put it back.
+  const holdsLocked = members.some(i => i.locked);
+
+  if (store.state.layers.length > 1 && !holdsLocked){
     const kill = el('button', 'kill', '×');
     kill.title = 'Delete layer — its contents move to the first layer';
     kill.onclick = e => {
       e.stopPropagation();
-      store.removeLayer(layer.id);
+      if (!store.removeLayer(layer.id)){
+        toast('That layer cannot be deleted.', true);
+        return;
+      }
       store.applyVisibility();
       store.changed();
     };

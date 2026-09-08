@@ -92,6 +92,12 @@ export function removeLayer(id){
   const idx = state.layers.findIndex(l => l.id === id);
   if (idx < 0) return false;
 
+  // A layer holding locked pieces cannot go. Deleting the Set layer used to
+  // tip the ground and backdrop into Product — which is the mask-pass
+  // compositing unit, so the product mask silently gained a floor — and
+  // nothing could recreate the layer afterwards.
+  if (itemsInLayer(id).some(i => i.locked)) return false;
+
   const fallback = state.layers.find(l => l.id !== id);
   for (const item of state.items){
     if (item.layerId === id) item.layerId = fallback.id;
@@ -112,6 +118,10 @@ export function addItem(item){
   if (item.layerId == null) item.layerId = state.activeLayerId;
   if (item.locked == null)  item.locked = false;
   if (item.params == null)  item.params = {};
+  // Reference images the image model should be given for this object — a
+  // product photo, a label, a screen. They are never rendered: the scene
+  // stays grey clay and these travel alongside it. See js/references.js.
+  if (item.refs == null)    item.refs = [];
   state.items.push(item);
   return item;
 }

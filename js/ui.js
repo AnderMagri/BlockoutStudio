@@ -15,7 +15,8 @@ import {
 import {
   addFromCatalog, applyRig, select, duplicateSelected, destroySelected,
   pickAt, lookThrough, frameSubject, applyCameraParams, setCompositionMode, setSetMode,
-  setOrbitAroundSelection, orbitMode, focusSelection, destroyItem, addCameraObject
+  setOrbitAroundSelection, orbitMode, focusSelection, destroyItem, addCameraObject,
+  centreSelection
 } from './objects.js';
 import { CATEGORIES } from './catalog.js';
 import { thumbnails, GLYPHS } from './thumbnails.js';
@@ -28,7 +29,7 @@ import {
   exportRender, exportDepth, exportNormal, exportMask, exportEdge,
   exportSize, capturePass
 } from './export.js';
-import { buildPrompt } from './prompt.js';
+import { buildPrompt, buildManifest, buildGenerationPrompt } from './prompt.js';
 import { renderLayers } from './layers.js';
 import { renderInspector } from './inspector.js';
 import { installGlobalAPI } from './api.js';
@@ -732,6 +733,7 @@ function buildInput(){
       case 'w': gizmo.setMode('translate'); break;
       case 'e': gizmo.setMode('rotate'); break;
       case 'r': gizmo.setMode('scale'); break;
+      case 'c': centreSelection(); break;
       case 'd': duplicateSelected(); break;
       case 'x': destroySelected(); break;
       // F frames what you have selected, or the whole scene when nothing is.
@@ -746,6 +748,22 @@ function buildInput(){
 }
 
 /* ---------------- scene API hooks ---------------- */
+
+/**
+ * The live camera, optics and lighting facts every prompt is built from.
+ * Read fresh each time so no prompt can describe a setup that is no
+ * longer on screen.
+ */
+function promptContext(){
+  const p = currentParams();
+  const format = currentFormat();
+  const focalReal = focalFromEquiv(p.equiv, format);
+  return {
+    format, focal:focalReal, fstop:p.fstop, focusM:p.focus,
+    dof: depthOfField(focalReal, p.fstop, p.focus, format),
+    shot: currentShot, rig: currentRig, aspect: getAspect()
+  };
+}
 
 /** Lets applyScene drive the same state the panels read. */
 const apiHooks = {
@@ -797,14 +815,27 @@ const apiHooks = {
 
   /** The prose description, built from the same live state as the sheet. */
   describeSetup(){
-    const p = currentParams();
-    const format = currentFormat();
-    const focalReal = focalFromEquiv(p.equiv, format);
-    return buildPrompt({
-      format, focal:focalReal, fstop:p.fstop, focusM:p.focus,
-      dof: depthOfField(focalReal, p.fstop, p.focus, format),
-      shot: currentShot, rig: currentRig, aspect: getAspect()
-    });
+    return buildPrompt(promptContext());
+  },
+
+  /**
+   * What would be sent to an image model right now: the ordered image
+   * manifest and the instruction that numbers it. Exposed so the wording
+   * can be read and checked before anything is spent on it.
+   */
+  generationPreview({ includeDepth = true, includeEdge = false, intent = '' } = {}){
+    const manifest = buildManifest({ includeDepth, includeEdge });
+    return {
+      prompt: buildGenerationPrompt(promptContext(), manifest, intent),
+      manifest: manifest.map((e, i) => ({
+        n: i + 1,
+        kind: e.kind,
+        pass: e.pass ?? null,
+        label: e.label,
+        role: e.kind === 'ref' ? e.ref.role : null,
+        object: e.kind === 'ref' ? e.item.name : null
+      }))
+    };
   },
 
   /** Render a pass with the panel's current options for that pass applied. */

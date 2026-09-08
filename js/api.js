@@ -45,6 +45,7 @@ import { POSES } from './figure.js';
 import { RIGS } from './lights.js';
 import { LENSES, SHOTS, ASPECTS, RESOLUTIONS, FORMATS } from './optics.js';
 import { toast } from './util.js';
+import { attachRef, detachRef, allRefs } from './references.js';
 import * as scenes from './scenes.js';
 import { activeCamera as activeCameraForApi } from './viewport.js';
 
@@ -52,6 +53,14 @@ import { activeCamera as activeCameraForApi } from './viewport.js';
 
 const vec = (v, fallback = [0, 0, 0]) =>
   Array.isArray(v) && v.length === 3 ? v : fallback;
+
+function itemNamed(name){
+  const item = store.state.items.find(
+    i => i.name?.toLowerCase() === String(name).toLowerCase()
+  );
+  if (!item) throw new Error(`No object called "${name}".`);
+  return item;
+}
 
 function layerNamed(name){
   if (!name) return null;
@@ -139,6 +148,8 @@ export async function applyScene(scene, { replace = true, hooks = {} } = {}){
     added++;
 
     if (spec.name) item.name = spec.name;
+
+    for (const ref of spec.refs || []) attachRef(item, ref);
 
     const [px, py, pz] = vec(spec.position);
     // Position is a nudge from where the studio placed it, not a hard set,
@@ -253,6 +264,11 @@ export function serializeScene(cameraState = {}){
         position: [round(item.obj.position.x), round(item.obj.position.y), round(item.obj.position.z)],
         layer: store.getLayer(item.layerId)?.name
       };
+      // Product and artwork references. Only the ids and filenames travel —
+      // the bytes live server-side, so a scene JSON stays small enough to
+      // paste. A scene moved to another machine will name references that
+      // machine does not have.
+      if (item.refs?.length) spec.refs = item.refs.map(r => ({ ...r }));
       const r = item.obj.rotation;
       if (r.x || r.y || r.z) spec.rotation = [deg(r.x), deg(r.y), deg(r.z)];
       const s = item.obj.scale;
@@ -370,6 +386,30 @@ export function installGlobalAPI(hooks){
 
     /** The studio's own prose description of the current setup. */
     describeSetup: () => hooks.describeSetup?.() ?? '',
+
+    /** The numbered image list and instruction to paste into an image tool. */
+    generationPreview: (opts) => hooks.generationPreview?.(opts),
+
+    /* ---- stand-ins ---- */
+
+    /**
+     * Declare that an object stands in for a real product you are
+     * supplying an image of. No file is involved — the studio only needs
+     * to know which grey shape it is, so the prompt can say so.
+     */
+    declareReference(objectName, ref){
+      const item = itemNamed(objectName);
+      return { object: item.name, ref: attachRef(item, ref) };
+    },
+
+    undeclareReference(objectName, index){
+      return { removed: detachRef(itemNamed(objectName), index) };
+    },
+
+    /** Every declaration in the scene, and which object each belongs to. */
+    listReferences: () => allRefs().map(({ item, ref }) => ({
+      object: item.name, ...ref
+    })),
 
     /**
      * Render a pass and return the pixels, so a caller can save them

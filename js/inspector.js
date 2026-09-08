@@ -13,7 +13,7 @@ import * as store from './store.js';
 import {
   duplicateSelected, destroySelected, updateLight, updateTextObject,
   applyCameraParams, lookThrough, refreshOutline, setPose, frameSubject,
-  setCameraLock, measureItem, resizeItem, restOnGround
+  setCameraLock, measureItem, resizeItem, restOnGround, centreSelection
 } from './objects.js';
 import { gizmo, activeCamera, renderer, getAspect } from './viewport.js';
 import { rebuildSpline, addControlPoint, removeControlPoint } from './spline.js';
@@ -146,6 +146,15 @@ function transformControls(host, item){
   host.appendChild(moveTo);
 
   if (!item.locked){
+    // Turns the camera without moving it, so a viewpoint you settled on
+    // survives — unlike "Fit to subject", which also picks a distance.
+    const centre = button(host, 'Centre in view', () => {
+      centreSelection();
+      renderInspector(true);
+    }, 'btn-quiet');
+    centre.style.marginTop = '6px';
+    centre.title = 'Aim the camera at this object, keeping its position (C)';
+
     const row = el('div', 'grid-2');
     row.style.marginTop = '6px';
     button(row, 'Duplicate', () => duplicateSelected());
