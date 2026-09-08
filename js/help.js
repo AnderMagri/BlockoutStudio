@@ -155,6 +155,12 @@ export const HELP_WORKFLOW = {
      'tied to this browser. Use Download for anything you want to keep or hand ' +
      'to someone else.'],
 
+    ['If the image contains something you did not ask for, the prompt named it.',
+     'Naming a piece of equipment makes a model draw it — say "softbox" and you ' +
+     'get a softbox hanging in the top of the frame. The brief describes light ' +
+     'by what it does to the subject for exactly this reason. The same trap is ' +
+     'worth remembering whenever you edit the text by hand.'],
+
     ['Exact logos and type cannot be generated.',
      'No image model reproduces real typography or a logo reliably — it produces ' +
      'something logo-shaped. For artwork that has to be exact, generate the ' +

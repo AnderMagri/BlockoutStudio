@@ -9,7 +9,7 @@
 import * as store from './store.js';
 import { dofCharacter, equivFromFocal } from './optics.js';
 import { kelvinName, mm } from './util.js';
-import { describeLight } from './lights.js';
+import { describeLightForPrompt, describeDirection } from './lights.js';
 import { labelFor } from './catalog.js';
 import { describeRefTargets } from './references.js';
 
@@ -55,18 +55,30 @@ function keyLight(){
   return lights.reduce((a, b) => (b.params.power > a.params.power ? b : a));
 }
 
+/*
+ * Lighting has to be described by what it does, never by the kit doing it.
+ *
+ * A prompt saying "large softbox directly overhead" comes back with a
+ * softbox hanging in the top of the frame: a named object is something the
+ * model draws. "Window light" paints a window. So every rig carries a
+ * `look` written for prompts alongside the `note` written for the panel,
+ * and single lights go through describeLightForPrompt.
+ */
 function describeLighting(rig){
   const key = keyLight();
   const lines = [];
 
-  if (rig) lines.push(rig.note);
-  else if (key) lines.push(`lit by a ${describeLight(key.params)}`);
+  if (rig) lines.push(rig.look ?? rig.note);
+  else if (key) lines.push(`lit by ${describeLightForPrompt(key.params)}`);
   else lines.push('soft even lighting');
 
   if (key){
+    // Plain words first, because that is what the model can act on; the
+    // angles follow for anyone rebuilding the setup for real.
     lines.push(
-      `key light at ${Math.round(key.params.az)} degrees azimuth and ` +
-      `${Math.round(key.params.el)} degrees elevation, ` +
+      `key light ${describeDirection(key.params.az, key.params.el)} ` +
+      `(${Math.round(key.params.az)}° azimuth, ` +
+      `${Math.round(key.params.el)}° elevation), ` +
       `${kelvinName(key.params.kelvin)} at ${Math.round(key.params.kelvin)}K`
     );
   }
