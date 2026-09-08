@@ -59,6 +59,8 @@ const HANDLERS = {
     };
   },
 
+  newScene: () => window.BlockoutStudio.newScene(),
+
   listScenes: () => ({ scenes: window.BlockoutStudio.listScenes() }),
 
   saveScene: params => window.BlockoutStudio.saveScene(params.name),

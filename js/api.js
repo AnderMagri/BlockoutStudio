@@ -291,6 +291,13 @@ export function installGlobalAPI(hooks){
     serializeScene: () => serializeScene(hooks.cameraState?.() ?? {}),
     vocabulary,
 
+    /** Discard everything and start over on the default boot scene. */
+    newScene(){
+      const result = hooks.newScene?.() ?? { ok:false, error:'newScene hook missing' };
+      toast('New scene');
+      return result;
+    },
+
     /** Fit the active camera to the subject. */
     frameSubject: () => frameSubject(activeCameraForApi()),
 

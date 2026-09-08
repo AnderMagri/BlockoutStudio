@@ -116,7 +116,9 @@ rotated bottle is bigger than the bottle.
 
 ## Saving scenes
 
-**Scenes…** in the top bar. Name the current scene and save it; reopen,
+**New** in the top bar starts over on the default scene (it asks first —
+save anything you want to keep). **Scenes…** is next to it: name the
+current scene and save it; reopen,
 download or delete it from the list. A scene is the same JSON the scene
 API speaks, so a saved scene, a pasted one and one an assistant built are
 all the same thing.
@@ -161,6 +163,7 @@ Every field is optional. From the browser console:
 BlockoutStudio.vocabulary()      // every id, pose, rig and shot it understands
 BlockoutStudio.serializeScene()  // the current scene as JSON
 BlockoutStudio.applyScene({ ... })
+BlockoutStudio.newScene()        // start over on the default scene
 ```
 
 ## Connecting it to an assistant (MCP)
@@ -209,6 +212,7 @@ node mcp/server.js
 | `studio_status` | Is a page connected? Call this first if anything fails |
 | `get_vocabulary` | Every object id, pose, rig, lens and shot it understands |
 | `get_scene` | The current scene as JSON |
+| `new_scene` | Discard everything and start fresh on the default scene |
 | `build_scene` | Build a scene from a description |
 | `set_camera` | Change lens, aperture, focus or framing |
 | `set_lighting` | Swap the lighting rig |

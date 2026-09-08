@@ -333,6 +333,14 @@ const TOOLS = [
     }
   },
   {
+    name: 'new_scene',
+    description:
+      'Discard the current scene and start fresh on the default one: a sphere, ' +
+      'the three-point rig and a single camera. Use save_scene first if the ' +
+      'current scene should be kept.',
+    inputSchema: { type:'object', properties:{}, additionalProperties:false }
+  },
+  {
     name: 'set_camera',
     description: 'Adjust the active camera without rebuilding the scene.',
     inputSchema: {
@@ -419,6 +427,7 @@ async function runTool(name, args = {}){
       };
 
     case 'get_vocabulary': return callPage('vocabulary');
+    case 'new_scene':      return callPage('newScene');
     case 'get_scene':      return callPage('getScene');
     case 'describe_setup': return callPage('describeSetup');
     case 'set_camera':     return callPage('setCamera', args);

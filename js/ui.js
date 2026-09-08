@@ -15,7 +15,7 @@ import {
 import {
   addFromCatalog, applyRig, select, duplicateSelected, destroySelected,
   pickAt, lookThrough, frameSubject, applyCameraParams, setCompositionMode, setSetMode,
-  setOrbitAroundSelection, orbitMode, focusSelection
+  setOrbitAroundSelection, orbitMode, focusSelection, destroyItem, addCameraObject
 } from './objects.js';
 import { CATEGORIES } from './catalog.js';
 import { thumbnails, GLYPHS } from './thumbnails.js';
@@ -720,6 +720,7 @@ const apiHooks = {
     });
   },
   afterBuild(){ frameSubject(activeCamera()); syncReadout(); },
+  newScene(){ return resetToDefaultScene(); },
   cameraState(){
     const p = currentParams();
     return {
@@ -749,11 +750,50 @@ export function applyShot(shot){
   syncReadout();
 }
 
+/**
+ * Reset the studio to the scene it boots with: three-point rig, a sphere,
+ * one camera looked through on the hero framing. The same code path serves
+ * the New button, BlockoutStudio.newScene() and the MCP new_scene tool.
+ */
+export function resetToDefaultScene(){
+  for (const item of [...store.state.items]){
+    if (item.kind === 'mesh' || item.kind === 'camera' || item.kind === 'light'){
+      destroyItem(item);
+    }
+  }
+  select(null);
+
+  const rig = applyRig('three-point');
+  if (rig) apiHooks.setRig(rig);
+  addFromCatalog('sphere');
+  const camera = addCameraObject({ formatId:'ff', equiv:85, fstop:2.8, focus:0.6 });
+
+  apiHooks.setStage({ set:'backdrop', compositionLight:false });
+  apiHooks.setExport({ aspect:'4:5', resolution:1536 });
+
+  lookThrough(camera);
+  applyShot(SHOTS[0]);
+  frameSubject(freeCamera);      // leave the Scene view usefully framed too
+  select(null);
+
+  store.applyVisibility();
+  store.changed();
+  syncReadout();
+  return { ok:true, scene:'default' };
+}
+
 /* ---------------- boot ---------------- */
 
 export function initUI(){
   $('addBtn').onclick = openObjectPicker;
   $('scenesBtn').onclick = openScenesPanel;
+  $('newBtn').onclick = () => {
+    // The wipe cannot be undone — the autosaved recovery copy is replaced
+    // by the fresh scene moments later — so it gets a question.
+    if (!confirm('Start a new scene? The current scene is discarded.')) return;
+    resetToDefaultScene();
+    toast('New scene');
+  };
   buildPivotToggle();
   buildSetControl();
   buildCompositionToggle();
